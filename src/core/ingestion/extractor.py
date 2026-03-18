@@ -31,12 +31,3 @@ def extract_file(path):
         raise ValueError(
             f"Định dạng file không được hỗ trợ (chỉ hỗ trợ .pdf, .docx)"
         )
-    
-def main():
-    INPUT_PATH = Path(r"D:\PTIT\BTL\TTCS\.temp\tongquan.pdf")
-    extract_file(INPUT_PATH)
-    return 0
-
-if __name__ == "__main__":
-    raise SystemExit(main())
-
