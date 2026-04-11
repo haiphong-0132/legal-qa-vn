@@ -153,6 +153,7 @@ if __name__ == "__main__":
         },
         embedding_params={
             'model_dir': str(EMBEDDING_MODEL_DIR),
+            'max_length': 128,
         },
         store_params={
             'collection_name': COLLECTION_NAME,
@@ -162,4 +163,3 @@ if __name__ == "__main__":
         }
 
     )
-    
