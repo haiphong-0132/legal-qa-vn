@@ -298,6 +298,8 @@ class Extractor:
             if doc_path.suffix.lower() == ".doc":
                 print(f"[DEBUG] Đang convert {doc_path.name} từ .doc sang .docx...")
                 docx_path = convert_doc_to_docx(doc_path, tmp_dir)
+                if docx_path is None:
+                    raise RuntimeError(f"Không thể convert file .doc: {doc_path}")
                 print(f"[DEBUG] Convert xong: {docx_path}")
             else:
                 docx_path = doc_path
