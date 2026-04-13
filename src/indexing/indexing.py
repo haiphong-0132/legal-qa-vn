@@ -93,6 +93,10 @@ def process_document(
         chunks=results[1]
         tqdm.write(f'Generated {len(chunks)} chunks')
 
+        # print chunk
+        # with open('debug_chunks.json', 'w', encoding='utf-8') as f:
+        #     json.dump([chunk.model_dump() for chunk in chunks], f, ensure_ascii=False, indent=4)
+
         # 3. Embedding
         tqdm.write('Generating embeddings')
         embedding_model = OnnxEmbeddingModel(
@@ -109,7 +113,6 @@ def process_document(
             ChromaConfig(**kwargs.get('store_params', {}))
         )
         vector_store_pipeline = VectorStorePipeline(
-            chunks=chunks,
             embeddings=embeddings
         )
         vector_store_pipeline.run(chroma_store)
@@ -139,6 +142,7 @@ if __name__ == "__main__":
         },
         embedding_params={
             'model_dir': str(EMBEDDING_MODEL_DIR),
+            'max_length': 128,
         },
         store_params={
             'collection_name': COLLECTION_NAME,
@@ -148,4 +152,3 @@ if __name__ == "__main__":
         }
 
     )
-    

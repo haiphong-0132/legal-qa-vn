@@ -2,7 +2,6 @@ from typing import Dict, List, Optional, Any, Literal
 from pydantic import BaseModel, Field, model_validator, ConfigDict
 from enum import Enum
 
-
 class HierarchicalChunkInput(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
     payload: Dict[str, Any] | List[Dict[str, Any]] = Field(
