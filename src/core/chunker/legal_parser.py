@@ -572,6 +572,7 @@ class ParseLegal:
                             'type':'khoan',
                             'type_id': f"{dieu_id}.khoan_{praw}",
                             'parent_id':dieu_id,
+                            
                             'lines':[pline],
                             'full_text':[pline],
                             'con':[]

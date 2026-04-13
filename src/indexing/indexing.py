@@ -6,8 +6,7 @@ from tkinter import Tk, filedialog
 ROOT_DIR = Path(__file__).resolve().parents[2]
 CHROMA_DB_DIR = ROOT_DIR / "chroma_db"
 COLLECTION_NAME = "legal_documents"
-EMBEDDING_MODEL_DIR = ROOT_DIR / "models" / "vietnamese-embedding"
-
+EMBEDDING_MODEL_DIR = ROOT_DIR / "models" / "Vietnamese_Embedding_v2"
 def select_file():
     root = Tk()
     root.withdraw()
