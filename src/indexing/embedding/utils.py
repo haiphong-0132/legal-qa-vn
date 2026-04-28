@@ -1,8 +1,9 @@
 """Embedding utilities."""
 
-from typing import Optional, List
+from typing import Optional, List, Any
 from src.core.models import DocumentNode
 from .schemas import EmbeddingRequest
+from ..chunker.schemas import ChunkMetadata
 
 SECTION_TYPE_NAMES = {
     'modau': 'Mở đầu',
@@ -15,105 +16,162 @@ SECTION_TYPE_NAMES = {
     'muc': 'Mục',
 }
 
-
-def decode_section_id(chunk_id: str) -> str:
+def _remove_chunk_suffix(level: str) -> str:
     """
-    Chuyển đổi chunk_id về dạng dễ hiểu.
+    Xóa sufix counter ở cuối level nếu có (tình huống document có chunk_id trùng nhau và được đánh số đuôi _N).
+    Ví dụ: diem_2_0 -> diem_2; diem_3_2_0 -> diem_3_2
+    """
+
+    if level.count('_') >= 2:
+        prefix, suffix = level.rsplit('_', 1)
+        if suffix.isdigit():
+            return prefix
+    return level
+
+def _model_to_dict(model: Any) -> dict[str, Any]:
+    """
+    Chuyển Pydantic model sang dict, loại bỏ các trường = None
+    """
+    if hasattr(model, "model_dump"):
+        return model.model_dump(exclude_none=True)
     
-    Ví dụ: "dieu_6.diem_2" -> "Điểm 2 điều 6"
-            "dieu_6.diem_2_0" -> "Điểm 2 điều 6" (removes suffix if present)
+    return model.dict(exclude_none=True)
+
+def decode_section_id(chunk_id: str) -> ChunkMetadata:
+    """
+    Chuyển đổi chunk_id thành ChunkMetadata.
+    
+    Ví dụ:
+        91_2015_qh13.dieu_6.khoan_1.diem_a
+    Thành:
+        ChunkMetadata(
+            van_ban="91_2015_qh13",
+            dieu="Điều 6",
+            khoan="Khoản 1",
+            diem="Điểm a"
+        )
     
     Args:
-        chunk_id: Section ID in format "level1_index1.level2_index2..." with optional _N suffix
+        chunk_id: ID của chunk
         
     Returns:
-        Human-readable section description
+        ChunkMetadata object        
         
     Raises:
         ValueError: If chunk_id format is invalid
     """
-    try:
-        parts = chunk_id.strip().split('.')
-        
-        # Remove suffix from last level ONLY if it has 2+ underscores
-        # This means: section_type_index_suffix (last _suffix is counter to remove)
-        # vs: section_type_index (only one underscore - keep as is)
-        if parts and '_' in parts[-1]:
-            last_part = parts[-1]
-            underscore_count = last_part.count('_')
-            # If 2+ underscores, last one is likely the suffix counter
-            if underscore_count >= 2:
-                # Remove only the last _N if N is digit
-                potential_suffix = last_part.rsplit('_', 1)
-                if len(potential_suffix) == 2 and potential_suffix[-1].isdigit():
-                    parts[-1] = potential_suffix[0]
-        
-        levels = parts
-    except Exception as e:
-        raise ValueError(f"Invalid chunk_id format: {chunk_id}. Error: {e}")
-    
-    result = []
-    for level in levels[1:]:
-        # Handle case when level doesn't contain '_'
-        if '_' not in level:
-            continue
-        le, index = level.split('_', 1)
-        index = '.'.join(index.split('_'))
-        if le in SECTION_TYPE_NAMES:
-            result.append(f"{SECTION_TYPE_NAMES[le]} {index}")
-        elif le.isdigit():
-            # Handle numeric law codes (e.g., "91" from "91_2015_qh13")
-            result.append(f"Luật {index}")
-        else:
-            raise ValueError(f"Không nhận diện được loại section {le} trong chunk_id {chunk_id}")
-    
-    return ' '.join(result[::-1])
 
+    if not chunk_id:
+        raise ValueError("chunk_id không được để trống")
+
+    try:
+        levels = chunk_id.strip().split('.')
+    
+    except Exception as e:
+        raise ValueError(f"Invalid chunk_id format: {chunk_id}. Error: {e}") from e
+    
+    if not levels:
+        raise ValueError(f"Invalid chunk_id format: {chunk_id}. No levels found.")
+    
+    metadata = ChunkMetadata(van_ban=levels[0])
+
+    for raw_level in levels[1:]:
+        level = _remove_chunk_suffix(raw_level)
+
+        if "_" not in level:
+            continue
+
+        section_type, index = level.split("_", 1)
+        index = ".".join(index.split("_"))
+
+        if section_type not in SECTION_TYPE_NAMES:
+            raise ValueError(
+                f"Không nhận diện được loại section '{section_type}' trong chunk_id: {chunk_id}"
+            )
+        
+        label = f'{SECTION_TYPE_NAMES[section_type]} {index}'
+
+        try:
+            setattr(metadata, section_type, label)
+        except Exception as e:
+            continue
+
+    return metadata
 
 def create_chunk_embedding_text(chunk: DocumentNode) -> str:
     """
     Tạo text embedding từ DocumentNode (chunk).
     
-    Kết hợp thông tin: mã đoạn, tiêu đề, nội dung, viện dẫn
-    
     Args:
         chunk: DocumentNode chứa dữ liệu chunk
         
     Returns:
-        Formatted text suitable for embedding
+        Text embedding được tạo từ chunk
     """
-    texts = []
+    texts: list[str] = []
     
-    # Mã đoạn (decoded)
-    if chunk.id:
-        texts.append(f'Mã đoạn: {decode_section_id(chunk.id)}')
+    if chunk.parent_context:
+        texts.append(chunk.parent_context)
     
-    # Tiêu đề
     if chunk.title:
-        texts.append(f'Tiêu đề: {chunk.title}')
+        texts.append(chunk.title)
     
-    # Nội dung
     if chunk.content:
-        texts.append(f'Nội dung: {chunk.content}')
-    
-    # Viện dẫn
-    if chunk.reference:
-        refs_str = ", ".join(decode_section_id(ref) for ref in chunk.reference)
-        texts.append(f'Các viện dẫn: {refs_str}')
+        texts.append(chunk.content)
     
     return '\n'.join(texts)
 
+def create_chunk_embedding_metadata(chunk: DocumentNode) -> dict[str, Any]:
+    """
+    Tạo metadata để lưu cùng vector embedding trong vector database.
+    Loại bỏ tất cả các trường rỗng (None, empty list, empty string) vì ChromaDB không cho phép.
+    """
+    metadata: dict[str, Any] = {}
 
-def create_embedding_request(text: str, chunk_id: str | None = None) -> EmbeddingRequest:
+    full_text_parts: list[str] = []
+
+    if chunk.parent_context:
+        full_text_parts.append(chunk.parent_context)
+    
+    if chunk.full_text:
+        full_text_parts.append(chunk.full_text)
+    
+    metadata_base = {
+        'full_text': '\n'.join(full_text_parts),
+        'parent_id': chunk.parent_id,
+        'section_type': chunk.type
+    }
+    
+    for key, value in metadata_base.items():
+        if value:
+            metadata[key] = value
+    
+    if chunk.reference:
+        metadata['reference'] = chunk.reference
+    
+    if chunk.id:
+        section_metadata = decode_section_id(chunk.id)
+        metadata.update(_model_to_dict(section_metadata))
+
+    return metadata
+
+def create_embedding_request(
+        text: str, 
+        chunk_id: str | None = None, 
+        num_chunk: int | None = None,
+        metadata: dict[str, Any] | None = None
+    ) -> EmbeddingRequest:
     """
     Tạo EmbeddingRequest từ text (cho query hoặc chunk text).
     
     Args:
         text: Nội dung text cần embedding
         chunk_id: Optional ID (dùng cho chunks, query không cần)
-        
+        num_chunk: Số lượng chunks
+        metadata: Metadata liên quan đến chunk
+
     Returns:
         EmbeddingRequest object
     """
-    return EmbeddingRequest(chunk_id=chunk_id, text=text)
+    return EmbeddingRequest(chunk_id=chunk_id, text=text, num_chunk=num_chunk, metadata=metadata or {})
 

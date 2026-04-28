@@ -19,7 +19,7 @@ class VectorStorePipeline(BaseModel):
                     chunk_id=embedding.chunk_id,
                     text=embedding.text,
                     vector=embedding.vector,
-                    metadata={"section_id": embedding.chunk_id, "num_chunk": embedding.num_chunk} # Có thể thêm thông tin khác nếu cần
+                    metadata=embedding.metadata
                 )
             )
         return requests

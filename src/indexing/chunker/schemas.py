@@ -7,3 +7,12 @@ class HierarchicalChunkInput(BaseModel):
         alias="json",
         description="Raw JSON đầu vào dùng cho hierarchical chunker."
     )
+
+class ChunkMetadata(BaseModel):
+    van_ban: Optional[str] = None
+    phan: Optional[str] = None
+    chuong: Optional[str] = None
+    muc: Optional[str] = None
+    dieu: Optional[str] = None
+    khoan: Optional[str] = None
+    diem: Optional[str] = None
