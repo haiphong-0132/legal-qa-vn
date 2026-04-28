@@ -45,18 +45,30 @@ class ChromaUpsertRequest(BaseModel):
 
 class ChromaQueryRequest(BaseModel):
     """
-    Yêu cầu truy vấn từ ChromaDB
+    Yêu cầu truy vấn từ ChromaDB. Query request với cả text và vector
     
     Attributes:
+        query: Văn bản truy vấn, được tạo ra từ module embedding
         query_vector: Vector embedding của câu truy vấn, được tạo ra từ module embedding
-        top_k: Số lượng kết quả trả về, mặc định là 5
-        filter: Bộ lọc theo metadata nếu cần, ví dụ {"section_id": "section_1"}
+        top_k: Số lượng kết quả trả về
+        filter: Bộ lọc theo metadata cho ChromaDB nếu cần, ví dụ {"section_id": "section_1"}
+
     """
-    query_vector: List[float]                  
-    top_k: int = Field(5, gt=0)
-    filter: Optional[Dict[str, Any]] = None     
+    query: Optional[str] = None
+    query_vector: Optional[List[float]] = None  
+    top_k: int = Field(5, ge=1, le=100, description="Số lượng kết quả trả về")
+    filter: Optional[Dict[str, Any]] = None
+    score_threshold: Optional[float] = Field(None, description="Ngưỡng điểm số để lọc kết quả, chỉ trả về các kết quả có điểm số thấp hơn ngưỡng này")
 
-
+    @model_validator(mode='after')
+    def validate_query(self):
+        """
+        Ít nhất một trong hai trường query hoặc query_vector phải được cung cấp
+        """
+        if not self.query and not self.query_vector:
+            raise ValueError('Ít nhất một trong hai trường query hoặc query_vector phải được cung cấp')
+        return self
+    
 class ChromaQueryResult(BaseModel):
     """
     Kết quả trả về từ ChromaDB sau khi truy vấn
@@ -66,8 +78,10 @@ class ChromaQueryResult(BaseModel):
         text: Nội dung của chunk, lấy từ ChromaDB
         metadata: Metadata của chunk, lấy từ ChromaDB
         distance: Khoảng cách giữa query_vector và vector của chunk trong ChromaDB, giá trị càng nhỏ thì càng gần nhau
+        score_rerank: Điểm số sau khi được tính toán lại với reranker
     """
     chunk_id: str
     text: str
     metadata: Dict[str, Any]
     distance: float
+    score_rerank: Optional[float] = None
