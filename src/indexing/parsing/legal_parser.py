@@ -1,7 +1,6 @@
 import re
 import unicodedata
 from .constants import VIETNAMESE_NUM_MAP, ROMAN_NUM_MAP
-
 class ParseLegal:
     def __init__(self,max_tokens=1000):
         self.max_tokens = max_tokens
@@ -120,7 +119,7 @@ class ParseLegal:
                 }
 
         return None
-
+    # Ham nay de phuc vu phan chia chunk phan mo dau (chi duoc su dung de chunking phan mo)
     def chunk_text_approx(self,text):
         """
         Hàm chia nhỏ văn bản (chunking) nhưng vẫn giữ nguyên trọn vẹn câu
@@ -189,14 +188,15 @@ class ParseLegal:
             #Xu ly Phan
             if ptype=='heading' and pid=='phan':
                 phan_id=f"{doc_id}.phan_{praw}"
+                phan_tieu_de_parts = [pline]
                 i+=1
                 phan_con=[]
-                phan_tieu_de=""
                 phan_content=[]
                 """Xu li phan tieu de cho Phan"""
                 if i<len(parsed_lines) and parsed_lines[i][0]=='text':
-                    phan_tieu_de=parsed_lines[i][3]
+                    phan_tieu_de_parts.append(parsed_lines[i][3])
                     i+=1
+                phan_tieu_de = " : ".join(phan_tieu_de_parts)
                 '''Phase 3.1 Scan Chuong/Muc/Dieu trong Phan'''
                 while i<len(parsed_lines):
                     dtype, did, draw, dline=parsed_lines[i]
@@ -206,14 +206,15 @@ class ParseLegal:
                         break
                     if dtype=='heading' and did=='chuong':
                         chuong_id=f"{phan_id}.chuong_{draw}"
+                        chuong_tieu_de_parts = [dline]
                         i+=1
                         chuong_con=[]
-                        chuong_tieu_de=""
                         chuong_content=[]
                         #Xu ly tieu de chuong
                         if i<len(parsed_lines) and parsed_lines[i][0]=='text':
-                            chuong_tieu_de=parsed_lines[i][3]
+                            chuong_tieu_de_parts.append(parsed_lines[i][3])
                             i+=1
+                        chuong_tieu_de = " : ".join(chuong_tieu_de_parts)
                         #Phase 3.1.1 Scan Muc/Dieu trong chuong
                         while i<len(parsed_lines):
                             etype,eid, eraw, eline=parsed_lines[i]
@@ -257,7 +258,7 @@ class ParseLegal:
                                     'type': "muc",
                                     "title": muc_tieu_de,
                                     "content": ". ".join(muc_content),
-                                    "ref":self.extract_refs(". ".join(muc_content), {'muc_id': muc_id, 'chuong_id': chuong_id, 'phan_id': phan_id}),
+                                    "ref":self.extract_refs(". ".join(muc_content), {'luat_id':doc_id, 'phan_id': phan_id, 'chuong_id': chuong_id, 'muc_id': muc_id}),
                                     "con": muc_con
                                 }
                                 chuong_con.append(muc_node)
@@ -280,7 +281,7 @@ class ParseLegal:
                             "type":"chuong",
                             'title': chuong_tieu_de,
                             "content":". ".join(chuong_content),
-                            "ref":self.extract_refs(". ".join(chuong_content), {'chuong_id': chuong_id, 'phan_id': phan_id}),
+                            "ref":self.extract_refs(". ".join(chuong_content), {'luat_id':doc_id, 'phan_id': phan_id, 'chuong_id': chuong_id}),
                             "con": chuong_con
                         }
                         phan_con.append(chuong_node)
@@ -318,7 +319,7 @@ class ParseLegal:
                             'type': "muc",
                             "title": muc_tieu_de,
                             "content": ". ".join(muc_content),
-                            "ref": self.extract_refs(". ".join(muc_content), {'muc_id': muc_id, 'phan_id': phan_id}),
+                            "ref": self.extract_refs(". ".join(muc_content), {'luat_id':doc_id, 'phan_id': phan_id, 'muc_id': muc_id}),
                             "con": muc_con
                         }
                         phan_con.append(muc_node)
@@ -349,14 +350,16 @@ class ParseLegal:
             #Case 2 : Xu ly các van ban ma tu mo dau->chuong->điều.
             elif ptype=='heading' and pid=='chuong':
                 chuong_id = f"{doc_id}.chuong_{praw}"
+                chuong_tieu_de_parts = [pline]
                 i += 1
                 chuong_con = []
-                chuong_tieu_de = ""
+                
                 chuong_content = []
                 # Xu ly tieu de chuong
                 if i < len(parsed_lines) and parsed_lines[i][0] == 'text':
-                    chuong_tieu_de = parsed_lines[i][3]
+                    chuong_tieu_de_parts.append(parsed_lines[i][3])
                     i += 1
+                chuong_tieu_de = " : ".join(chuong_tieu_de_parts)
                 # Phase 3.1.1 Scan Muc/Dieu trong chuong
                 while i < len(parsed_lines):
                     etype, eid, eraw, eline = parsed_lines[i]
@@ -491,7 +494,7 @@ class ParseLegal:
         _,_, dieu_id_raw, dieu_line=parsed_lines[start_idx]
         i=start_idx+1
         dieu_content=[]
-        dieu_full_text=[]
+        dieu_full_text=[dieu_line]
         dieu_con=[] #Chua khoan co the co Diem con
         khoan_type={'khoan','so_cap_3', 'so_cap_2', 'so_cap_1'}
         diem_types={'diem', 'chu_thuong'}
@@ -558,7 +561,6 @@ class ParseLegal:
                             'type':'khoan',
                             'type_id': f"{dieu_id}.khoan_{praw}",
                             'parent_id':dieu_id,
-                            
                             'lines':[pline],
                             'full_text':[pline],
                             'con':[]
