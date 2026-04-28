@@ -16,13 +16,15 @@ class ChunkMetadata(BaseModel):
     dieu: Optional[str] = None
     khoan: Optional[str] = None
     diem: Optional[str] = None
+    modau: Optional[str] = None
+    chinh: Optional[str] = None
     
     def display(self) -> str:
         """
         Chuyển ChunkMetadata thành chuỗi hiển thị theo thứ tự từ cụ thể đến tổng quát.
         Ví dụ: ChunkMetadata(dieu="Điều 663", khoan="Khoản 1") -> "Khoản 1 Điều 663"
         """
-        hierarchy_order = ['diem', 'khoan', 'dieu', 'muc', 'chuong', 'phan', 'van_ban']
+        hierarchy_order = ['diem', 'khoan', 'dieu', 'muc', 'chuong', 'phan', 'chinh', 'modau', 'van_ban']
         parts = [getattr(self, level, None) for level in hierarchy_order]
         result = " ".join(p for p in parts if p)
         return result or "N/A"
@@ -32,7 +34,7 @@ class ChunkMetadata(BaseModel):
         Tìm cấp hiện tại của chunk
         Ví dụ: ChunkMetadata(dieu="Điều 663", khoan="Khoản 1") -> "khoan"
         """
-        hierarchy_order = ['diem', 'khoan', 'dieu', 'muc', 'chuong', 'phan', 'van_ban']
+        hierarchy_order = ['diem', 'khoan', 'dieu', 'muc', 'chuong', 'phan', 'chinh', 'modau', 'van_ban']
         for level in hierarchy_order:
             if getattr(self, level, None):
                 return level

@@ -184,18 +184,18 @@ class ParseLegal:
                 tree.append(node)
         #Phase 3 : Scan tung Phan hoac tung Dieu, xay cay phan cap
         while i<len(parsed_lines):
-            ptype, pid, praw, pline=parsed_lines[i]
-            #Xu ly Phan
-            if ptype=='heading' and pid=='phan':
-                phan_id=f"{doc_id}.phan_{praw}"
+            ptype, pid, praw, pline = parsed_lines[i]
+            # Xu ly Phan
+            if ptype == 'heading' and pid == 'phan':
+                phan_id = f"{doc_id}.phan_{praw}"
                 phan_tieu_de_parts = [pline]
-                i+=1
-                phan_con=[]
-                phan_content=[]
+                i += 1
+                phan_con = []
+                phan_content = []
                 """Xu li phan tieu de cho Phan"""
-                if i<len(parsed_lines) and parsed_lines[i][0]=='text':
+                while i < len(parsed_lines) and parsed_lines[i][0] == 'text':
                     phan_tieu_de_parts.append(parsed_lines[i][3])
-                    i+=1
+                    i += 1
                 phan_tieu_de = " : ".join(phan_tieu_de_parts)
                 '''Phase 3.1 Scan Chuong/Muc/Dieu trong Phan'''
                 while i<len(parsed_lines):
@@ -204,16 +204,16 @@ class ParseLegal:
                     #Neu gap phan khac , thoat
                     if dtype=='heading' and did=='phan':
                         break
-                    if dtype=='heading' and did=='chuong':
-                        chuong_id=f"{phan_id}.chuong_{draw}"
+                    if dtype == 'heading' and did == 'chuong':
+                        chuong_id = f"{phan_id}.chuong_{draw}"
                         chuong_tieu_de_parts = [dline]
-                        i+=1
-                        chuong_con=[]
-                        chuong_content=[]
-                        #Xu ly tieu de chuong
-                        if i<len(parsed_lines) and parsed_lines[i][0]=='text':
+                        i += 1
+                        chuong_con = []
+                        chuong_content = []
+                        # Xu ly tieu de chuong
+                        while i < len(parsed_lines) and parsed_lines[i][0] == 'text':
                             chuong_tieu_de_parts.append(parsed_lines[i][3])
-                            i+=1
+                            i += 1
                         chuong_tieu_de = " : ".join(chuong_tieu_de_parts)
                         #Phase 3.1.1 Scan Muc/Dieu trong chuong
                         while i<len(parsed_lines):
@@ -348,15 +348,14 @@ class ParseLegal:
                 }
                 tree.append(phan_node)
             #Case 2 : Xu ly các van ban ma tu mo dau->chuong->điều.
-            elif ptype=='heading' and pid=='chuong':
+            elif ptype == 'heading' and pid == 'chuong':
                 chuong_id = f"{doc_id}.chuong_{praw}"
                 chuong_tieu_de_parts = [pline]
                 i += 1
                 chuong_con = []
-                
                 chuong_content = []
                 # Xu ly tieu de chuong
-                if i < len(parsed_lines) and parsed_lines[i][0] == 'text':
+                while i < len(parsed_lines) and parsed_lines[i][0] == 'text':
                     chuong_tieu_de_parts.append(parsed_lines[i][3])
                     i += 1
                 chuong_tieu_de = " : ".join(chuong_tieu_de_parts)
