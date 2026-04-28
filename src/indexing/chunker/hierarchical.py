@@ -105,6 +105,7 @@ class HierarchicalChunker:
         parent_id = node.get("parent_id")
         type_node=node.get("type")
         full_text=node.get("full_text") if (node.get('type')=='khoan' or node.get('type')=="dieu") else None
+        parent_context = node.get("parent_context")
         if not any([title, content, refs]):
             return None
         if not node_id:
@@ -117,7 +118,7 @@ class HierarchicalChunker:
                 chunk_id_counters[node_id] += 1
             else:
                 chunk_id_counters[node_id] = 0
-            unique_id = f"{node_id}_{chunk_id_counters[node_id]}"
+            unique_id = f"{node_id}__dup_{chunk_id_counters[node_id]}"
         else:
             # No duplicate - keep ID as is
             unique_id = node_id
@@ -127,6 +128,7 @@ class HierarchicalChunker:
             type=type_node,
             parent_id=parent_id,
             title=title,
+            parent_context=parent_context,
             content=content,
             full_text=full_text,
             reference=refs

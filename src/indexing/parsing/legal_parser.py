@@ -1,7 +1,6 @@
 import re
 import unicodedata
 from .constants import VIETNAMESE_NUM_MAP, ROMAN_NUM_MAP
-
 class ParseLegal:
     def __init__(self,max_tokens=1000):
         self.max_tokens = max_tokens
@@ -120,7 +119,7 @@ class ParseLegal:
                 }
 
         return None
-
+    # Ham nay de phuc vu phan chia chunk phan mo dau (chi duoc su dung de chunking phan mo)
     def chunk_text_approx(self,text):
         """
         Hàm chia nhỏ văn bản (chunking) nhưng vẫn giữ nguyên trọn vẹn câu
@@ -185,18 +184,19 @@ class ParseLegal:
                 tree.append(node)
         #Phase 3 : Scan tung Phan hoac tung Dieu, xay cay phan cap
         while i<len(parsed_lines):
-            ptype, pid, praw, pline=parsed_lines[i]
-            #Xu ly Phan
-            if ptype=='heading' and pid=='phan':
-                phan_id=f"{doc_id}.phan_{praw}"
-                i+=1
-                phan_con=[]
-                phan_tieu_de=""
-                phan_content=[]
+            ptype, pid, praw, pline = parsed_lines[i]
+            # Xu ly Phan
+            if ptype == 'heading' and pid == 'phan':
+                phan_id = f"{doc_id}.phan_{praw}"
+                phan_tieu_de_parts = [pline]
+                i += 1
+                phan_con = []
+                phan_content = []
                 """Xu li phan tieu de cho Phan"""
-                if i<len(parsed_lines) and parsed_lines[i][0]=='text':
-                    phan_tieu_de=parsed_lines[i][3]
-                    i+=1
+                while i < len(parsed_lines) and parsed_lines[i][0] == 'text':
+                    phan_tieu_de_parts.append(parsed_lines[i][3])
+                    i += 1
+                phan_tieu_de = " : ".join(phan_tieu_de_parts)
                 '''Phase 3.1 Scan Chuong/Muc/Dieu trong Phan'''
                 while i<len(parsed_lines):
                     dtype, did, draw, dline=parsed_lines[i]
@@ -204,16 +204,17 @@ class ParseLegal:
                     #Neu gap phan khac , thoat
                     if dtype=='heading' and did=='phan':
                         break
-                    if dtype=='heading' and did=='chuong':
-                        chuong_id=f"{phan_id}.chuong_{draw}"
-                        i+=1
-                        chuong_con=[]
-                        chuong_tieu_de=""
-                        chuong_content=[]
-                        #Xu ly tieu de chuong
-                        if i<len(parsed_lines) and parsed_lines[i][0]=='text':
-                            chuong_tieu_de=parsed_lines[i][3]
-                            i+=1
+                    if dtype == 'heading' and did == 'chuong':
+                        chuong_id = f"{phan_id}.chuong_{draw}"
+                        chuong_tieu_de_parts = [dline]
+                        i += 1
+                        chuong_con = []
+                        chuong_content = []
+                        # Xu ly tieu de chuong
+                        while i < len(parsed_lines) and parsed_lines[i][0] == 'text':
+                            chuong_tieu_de_parts.append(parsed_lines[i][3])
+                            i += 1
+                        chuong_tieu_de = " : ".join(chuong_tieu_de_parts)
                         #Phase 3.1.1 Scan Muc/Dieu trong chuong
                         while i<len(parsed_lines):
                             etype,eid, eraw, eline=parsed_lines[i]
@@ -243,7 +244,7 @@ class ParseLegal:
                                     #Neu la dieu
                                     if ftype=='heading' and fid=='dieu':
                                         context={'luat_id':doc_id, 'phan_id':phan_id, 'chuong_id':chuong_id, 'muc_id':muc_id, 'dieu_id':f"{muc_id}.dieu_{fraw}"}
-                                        dieu_node=self._extract_dieu(parsed_lines, i, context)
+                                        dieu_node=self._extract_dieu(parsed_lines, i, context, parent_id=muc_id)
                                         muc_con.append(dieu_node)
                                         i=dieu_node["_end_idx"]
                                     else:
@@ -257,7 +258,7 @@ class ParseLegal:
                                     'type': "muc",
                                     "title": muc_tieu_de,
                                     "content": ". ".join(muc_content),
-                                    "ref":self.extract_refs(". ".join(muc_content), {'muc_id': muc_id, 'chuong_id': chuong_id, 'phan_id': phan_id}),
+                                    "ref":self.extract_refs(". ".join(muc_content), {'luat_id':doc_id, 'phan_id': phan_id, 'chuong_id': chuong_id, 'muc_id': muc_id}),
                                     "con": muc_con
                                 }
                                 chuong_con.append(muc_node)
@@ -266,7 +267,7 @@ class ParseLegal:
                             #Neu Dieu truc tiep trong Chuong ko co Muc
                             elif etype=="heading" and eid=='dieu':
                                 context={'luat_id':doc_id, 'chuong_id':chuong_id, 'phan_id':phan_id, 'dieu_id':f"{chuong_id}.dieu_{eraw}"}
-                                dieu_node=self._extract_dieu(parsed_lines, i, context)
+                                dieu_node=self._extract_dieu(parsed_lines, i, context, parent_id=chuong_id)
                                 chuong_con.append(dieu_node)
                                 i=dieu_node["_end_idx"]
                             else:
@@ -280,7 +281,7 @@ class ParseLegal:
                             "type":"chuong",
                             'title': chuong_tieu_de,
                             "content":". ".join(chuong_content),
-                            "ref":self.extract_refs(". ".join(chuong_content), {'chuong_id': chuong_id, 'phan_id': phan_id}),
+                            "ref":self.extract_refs(". ".join(chuong_content), {'luat_id':doc_id, 'phan_id': phan_id, 'chuong_id': chuong_id}),
                             "con": chuong_con
                         }
                         phan_con.append(chuong_node)
@@ -304,11 +305,11 @@ class ParseLegal:
                                 break
                             if ftype=='heading' and fid=='dieu':
                                 context={'luat_id':doc_id,  'phan_id':phan_id,'muc_id':muc_id, 'dieu_id': f"{muc_id}.dieu_{fraw}"}
-                                dieu_node=self._extract_dieu(parsed_lines, i, context)
+                                dieu_node=self._extract_dieu(parsed_lines, i, context, parent_id=muc_id)
                                 muc_con.append(dieu_node)
                                 i=dieu_node['_end_idx']
                             else:
-                                if dtype=="text":
+                                if ftype=="text":
                                     muc_content.append(fline)
                                 i+=1
 
@@ -318,7 +319,7 @@ class ParseLegal:
                             'type': "muc",
                             "title": muc_tieu_de,
                             "content": ". ".join(muc_content),
-                            "ref": self.extract_refs(". ".join(muc_content), {'muc_id': muc_id, 'phan_id': phan_id}),
+                            "ref": self.extract_refs(". ".join(muc_content), {'luat_id':doc_id, 'phan_id': phan_id, 'muc_id': muc_id}),
                             "con": muc_con
                         }
                         phan_con.append(muc_node)
@@ -326,7 +327,7 @@ class ParseLegal:
                     #Neu Dieu truc tiep trong Phan
                     elif dtype == 'heading' and did == 'dieu':
                         context={'luat_id':doc_id, 'phan_id':phan_id,'dieu_id':f"{phan_id}.dieu_{draw}"}
-                        dieu_node = self._extract_dieu(parsed_lines, i, context)
+                        dieu_node = self._extract_dieu(parsed_lines, i, context, parent_id=phan_id)
                         phan_con.append(dieu_node)
                         i = dieu_node['_end_idx']
 
@@ -347,16 +348,17 @@ class ParseLegal:
                 }
                 tree.append(phan_node)
             #Case 2 : Xu ly các van ban ma tu mo dau->chuong->điều.
-            elif ptype=='heading' and pid=='chuong':
+            elif ptype == 'heading' and pid == 'chuong':
                 chuong_id = f"{doc_id}.chuong_{praw}"
+                chuong_tieu_de_parts = [pline]
                 i += 1
                 chuong_con = []
-                chuong_tieu_de = ""
                 chuong_content = []
                 # Xu ly tieu de chuong
-                if i < len(parsed_lines) and parsed_lines[i][0] == 'text':
-                    chuong_tieu_de = parsed_lines[i][3]
+                while i < len(parsed_lines) and parsed_lines[i][0] == 'text':
+                    chuong_tieu_de_parts.append(parsed_lines[i][3])
                     i += 1
+                chuong_tieu_de = " : ".join(chuong_tieu_de_parts)
                 # Phase 3.1.1 Scan Muc/Dieu trong chuong
                 while i < len(parsed_lines):
                     etype, eid, eraw, eline = parsed_lines[i]
@@ -386,7 +388,7 @@ class ParseLegal:
                             # Neu la dieu
                             if ftype == 'heading' and fid == 'dieu':
                                 context={'luat_id':doc_id, 'chuong_id':chuong_id,'muc_id':muc_id ,'dieu_id':f"{muc_id}.dieu_{fraw}"}
-                                dieu_node = self._extract_dieu(parsed_lines, i, context)
+                                dieu_node = self._extract_dieu(parsed_lines, i, context, parent_id=muc_id)
                                 muc_con.append(dieu_node)
                                 i = dieu_node["_end_idx"]
                             else:
@@ -409,7 +411,7 @@ class ParseLegal:
                     # Neu Dieu truc tiep trong Chuong ko co Muc
                     elif etype == "heading" and eid == 'dieu':
                         context = {'luat_id': doc_id, 'chuong_id': chuong_id,'dieu_id': f"{chuong_id}.dieu_{eraw}"}
-                        dieu_node = self._extract_dieu(parsed_lines, i, context)
+                        dieu_node = self._extract_dieu(parsed_lines, i, context, parent_id=chuong_id)
                         chuong_con.append(dieu_node)
                         i = dieu_node["_end_idx"]
                     else:
@@ -430,7 +432,7 @@ class ParseLegal:
             #Case 3 : Xu ly cac van ban nhu thong tu, nghi dinh, truc tiep vao Dieu luon khong co Phan/Chuong
             elif ptype=='heading' and pid=='dieu':
                 context={'luat_id':doc_id , 'dieu_id':f"{doc_id}.dieu_{praw}"}
-                dieu_node=self._extract_dieu(parsed_lines, i, context)
+                dieu_node=self._extract_dieu(parsed_lines, i, context, parent_id=doc_id)
                 tree.append(dieu_node)
                 i=dieu_node['_end_idx']
 
@@ -447,10 +449,39 @@ class ParseLegal:
                         cleanup_end_idx(n['con'])
 
         cleanup_end_idx(tree)
+        
+        #Add parent_context để giữ ngữ cảnh parent khi embedding
+        def add_parent_context_to_tree(nodes, parent_node=None):
+            """
+            Recursively add parent_context to all child nodes.
+            parent_context = parent's title + content (nếu có)
+            Dùng để giữ ngữ cảnh khi embedding node con
+            """
+            for node in nodes:
+                if node is None:
+                    continue
+                
+                # Add parent_context từ parent node
+                if parent_node:
+                    context_parts = []
+                    if parent_node.get('parent_context'):
+                        context_parts.append(parent_node['parent_context'])
+                    if parent_node.get('title'):
+                        context_parts.append(parent_node['title'])
+                    if parent_node.get('content'):
+                        context_parts.append(parent_node['content'])
+                    
+                    node['parent_context'] = '\n'.join(context_parts) if context_parts else None
+                
+                # Recursively process children
+                if 'con' in node and node['con']:
+                    add_parent_context_to_tree(node['con'], node)
+
+        add_parent_context_to_tree(tree)
         return tree
 
 
-    def _extract_dieu(self,parsed_lines, start_idx: int, context: dict):
+    def _extract_dieu(self,parsed_lines, start_idx: int, context: dict, parent_id:str):
         """
         Extract Điều node từ parsed_lines, bắt đầu từ start_idx
         Return node với _end_idx để biết vị trí kế tiếp
@@ -462,7 +493,7 @@ class ParseLegal:
         _,_, dieu_id_raw, dieu_line=parsed_lines[start_idx]
         i=start_idx+1
         dieu_content=[]
-        dieu_full_text=[]
+        dieu_full_text=[dieu_line]
         dieu_con=[] #Chua khoan co the co Diem con
         khoan_type={'khoan','so_cap_3', 'so_cap_2', 'so_cap_1'}
         diem_types={'diem', 'chu_thuong'}
@@ -529,7 +560,6 @@ class ParseLegal:
                             'type':'khoan',
                             'type_id': f"{dieu_id}.khoan_{praw}",
                             'parent_id':dieu_id,
-                            
                             'lines':[pline],
                             'full_text':[pline],
                             'con':[]
@@ -564,11 +594,11 @@ class ParseLegal:
                                 dieu_con.append(current_diem)
 
                         #Tao Diem moi
-                        parent_id=current_khoan['type_id'] if current_khoan is not None else dieu_id
+                        diem_parent_id=current_khoan['type_id'] if current_khoan is not None else dieu_id
                         current_diem={
                             'type':'diem',
-                            'type_id': f"{parent_id}.diem_{praw}",
-                            'parent_id':parent_id,
+                            'type_id': f"{diem_parent_id}.diem_{praw}",
+                            'parent_id':diem_parent_id,
                             'lines':[pline]
                         }
                     else :
@@ -615,6 +645,7 @@ class ParseLegal:
             "type": 'dieu',
             'type_id': dieu_id,
             'title': dieu_line,
+            'parent_id': parent_id,
             'content': dieu_text,
             'full_text': ". ".join(dieu_full_text),
             'ref': self.extract_refs(dieu_text, context)

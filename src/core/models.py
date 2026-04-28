@@ -3,7 +3,6 @@ from typing import Optional, List
 from .enums import RelationType
 
 class DocumentMetadata(BaseModel):
-    document_id: Optional[int] = None
     so_hieu:str=""
     ten_van_ban:str=""
     loai:str=""
@@ -25,6 +24,7 @@ class DocumentNode(BaseModel):
     id: Optional[str]=None
     type:Optional[str]=None
     parent_id:Optional[str]=None
+    parent_context: Optional[str]=None
     title:Optional[str]=None
     content:Optional[str]=None
     full_text:Optional[str]=None

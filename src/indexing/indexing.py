@@ -121,7 +121,8 @@ def process_document(
             'message': 'Document processed successfully',
             'collection': chroma_config.collection_name,
             'chunks_count': chunks_count,
-            'embeddings_count': embeddings_count
+            'embeddings_count': embeddings_count,
+            'metadata': tree.model_dump() if hasattr(tree, 'model_dump') else tree # Trả về metadata của document node để sử dụng cho các bước khác (xây dựng quan hệ giữa các node...)
         }
 
     except Exception as e:
@@ -135,7 +136,8 @@ def process_document(
             'message': error_msg,
             'collection': None,
             'chunks_count': 0,
-            'embeddings_count': 0
+            'embeddings_count': 0,
+            'metadata': None
         }
 
 if __name__ == "__main__":
