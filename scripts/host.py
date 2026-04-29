@@ -1,4 +1,3 @@
-import os
 import json
 import argparse
 from typing import List, Optional
@@ -11,21 +10,20 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer, CrossEncoder
 from transformers import AutoTokenizer, AutoModelForCausalLM, AutoModelForSequenceClassification
-from dotenv import load_dotenv
 
-load_dotenv()
 
-os.environ["HF_TOKEN"] = str(os.getenv("HF_TOKEN", ""))
+HOST = "127.0.0.1"
+PORT = 8000
 
-HOST = os.getenv("HOST", "127.0.0.1")
-PORT = int(os.getenv("PORT", "8000"))
+EMBED_MODEL_NAME = "AITeamVN/Vietnamese_Embedding"
+RERANK_MODEL_NAME = "AITeamVN/Vietnamese_Reranker"
+LLM_MODEL_NAME = "Qwen/Qwen3-8B"
 
-EMBED_MODEL_NAME = os.getenv("EMBED_MODEL_NAME", "AITeamVN/Vietnamese_Embedding")
-RERANK_MODEL_NAME = os.getenv("RERANK_MODEL_NAME", "AITeamVN/Vietnamese_Reranker")
-LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen/Qwen3-8B")
+API_EMBED_DIM = 1024
 
-API_EMBED_DIM = int(os.getenv("API_EMBED_DIM", "1024"))
-RERANK_MAX_LENGTH = int(os.getenv("RERANK_MAX_LENGTH", "2304"))
+EMBED_MAX_LENGTH = 256
+RERANK_MAX_LENGTH = 2304
+GENERATE_MAX_INPUT_LENGTH = 2048
 
 # Tự ưu tiên GPU NVIDIA nếu có
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -87,6 +85,7 @@ def load_models() -> None:
     if embed_model is None:
         print(f"[LOAD] Embedding model: {EMBED_MODEL_NAME}")
         embed_model = SentenceTransformer(EMBED_MODEL_NAME, device=DEVICE)
+        embed_model.max_seq_length = EMBED_MAX_LENGTH
         print("[OK] Embedding model loaded")
 
     if reranker_model is None:
@@ -117,6 +116,90 @@ def load_models() -> None:
         llm_model.to(DEVICE)
         llm_model.eval()
         print("[OK] LLM model loaded")
+
+
+def validate_embed_inputs_not_truncated(
+    texts: List[str],
+    max_length: int,
+) -> None:
+    """
+    Kiểm tra input embedding có vượt max_length không.
+
+    Nếu vượt, SentenceTransformer có thể truncate text ngầm khi encode.
+    Với indexing/vector search, truncate ngầm có thể làm embedding mất thông tin,
+    nên trả lỗi rõ ràng.
+    """
+    assert embed_model is not None
+
+    tokenizer = embed_model.tokenizer
+    too_long_items = []
+
+    for index, text in enumerate(texts):
+        encoded = tokenizer(
+            text,
+            add_special_tokens=True,
+            truncation=False,
+        )
+
+        token_length = len(encoded["input_ids"])
+
+        if token_length > max_length:
+            too_long_items.append(
+                {
+                    "index": index,
+                    "token_length": token_length,
+                    "max_length": max_length,
+                    "text_preview": text[:200],
+                }
+            )
+
+    if too_long_items:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": (
+                    "Embedding input is too long and would be truncated. "
+                    "Please chunk the text into smaller pieces or increase EMBED_MAX_LENGTH."
+                ),
+                "max_length": max_length,
+                "too_long_items": too_long_items,
+            },
+        )
+
+
+def validate_generate_input_not_truncated(
+    prompt: str,
+    max_length: int,
+) -> None:
+    """
+    Kiểm tra prompt generate có vượt max_length không.
+
+    Nếu vượt, tokenizer sẽ truncate prompt ngầm. Với RAG, truncate prompt
+    có thể làm mất context, nên trả lỗi rõ ràng.
+    """
+    assert llm_tokenizer is not None
+
+    encoded = llm_tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=False,
+    )
+
+    token_length = encoded["input_ids"].shape[1]
+
+    if token_length > max_length:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": (
+                    "Generate input prompt is too long and would be truncated. "
+                    "Please reduce context length or increase GENERATE_MAX_INPUT_LENGTH."
+                ),
+                "token_length": token_length,
+                "max_length": max_length,
+                "prompt_preview": prompt[:300],
+            },
+        )
 
 
 def validate_rerank_inputs_not_truncated(
@@ -198,6 +281,11 @@ def embed(req: EmbedRequest):
     try:
         assert embed_model is not None
 
+        validate_embed_inputs_not_truncated(
+            texts=req.texts,
+            max_length=EMBED_MAX_LENGTH,
+        )
+
         embeddings = embed_model.encode(
             req.texts,
             convert_to_numpy=True,
@@ -210,6 +298,9 @@ def embed(req: EmbedRequest):
             "dimension": API_EMBED_DIM,
             "device": DEVICE,
         }
+
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Embedding error: {exc}") from exc
 
@@ -219,13 +310,17 @@ def generate(req: GenerateRequest):
     try:
         assert llm_tokenizer is not None and llm_model is not None
 
+        validate_generate_input_not_truncated(
+            prompt=req.prompt,
+            max_length=GENERATE_MAX_INPUT_LENGTH,
+        )
+
         max_new_tokens = max(1, min(req.max_length, 512))
 
         inputs = llm_tokenizer(
             req.prompt,
             return_tensors="pt",
-            truncation=True,
-            max_length=2048,
+            truncation=False,
         )
         inputs = {k: v.to(DEVICE) for k, v in inputs.items()}
 
@@ -265,6 +360,9 @@ def generate(req: GenerateRequest):
             "answer": answer,
             "device": DEVICE,
         }
+
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Generation error: {exc}") from exc
 
