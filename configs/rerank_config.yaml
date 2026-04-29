@@ -1,6 +1,0 @@
-reranker:
-  model_dir: "AITeamVN/Vietnamese_Reranker"
-  device: "cpu"
-  batch_size: 32
-  normalize_scores: true
-  max_length: 512

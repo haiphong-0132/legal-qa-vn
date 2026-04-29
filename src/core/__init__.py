@@ -1,7 +1,3 @@
-"""Core module - common utilities and base classes."""
+"""Core module."""
 
-from .config import BaseConfig
-
-__all__ = [
-    "BaseConfig",
-]
+__all__ = []

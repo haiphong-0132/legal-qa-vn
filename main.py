@@ -11,7 +11,6 @@ DEFAULT_COLLECTION_NAME = "legal_documents"
 DEFAULT_CHROMA_DIR = PROJECT_ROOT / "chroma_db"
 DEFAULT_EMBEDDING_MODEL_DIR = PROJECT_ROOT / "models" / "Vietnamese_Embedding_v2"
 DEFAULT_RERANKER_MODEL_NAME = "AITeamVN/Vietnamese_Reranker"
-DEFAULT_PROMPT_TEMPLATE = PROJECT_ROOT / "configs" / "prompts" / "rag_answer_prompt.txt"
 
 
 def build_chroma_store():
@@ -131,7 +130,6 @@ def print_search_results(results):
 def handle_index_local():
     """Index document using local embedding."""
     from src.indexing.indexing import process_document
-    from src.indexing.config import IndexingConfig
 
     logger.info("[LOCAL INDEXING]")
 
@@ -143,7 +141,6 @@ def handle_index_local():
     try:
         result = process_document(
             file_path=file_path,
-            config=IndexingConfig.get_default_config(),
             use_remote_api=False,
         )
 
@@ -156,7 +153,6 @@ def handle_index_local():
 def handle_index_remote():
     """Index document using remote embedding API."""
     from src.indexing.indexing import process_document
-    from src.indexing.config import IndexingConfig
 
     logger.info("[REMOTE INDEXING]")
 
@@ -168,7 +164,6 @@ def handle_index_remote():
     try:
         result = process_document(
             file_path=file_path,
-            config=IndexingConfig.get_default_config(),
             use_remote_api=True,
         )
 
@@ -300,7 +295,6 @@ def handle_rag():
         rag_service = RAGService(
             search_service=search_service,
             api_client=api_client,
-            prompt_template_path=str(DEFAULT_PROMPT_TEMPLATE),
             top_k_retrieve=top_k_retrieve,
             top_k_rerank=top_k_rerank,
             use_rerank=use_rerank,
