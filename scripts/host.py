@@ -25,6 +25,7 @@ RERANK_MODEL_NAME = os.getenv("RERANK_MODEL_NAME", "AITeamVN/Vietnamese_Reranker
 LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "Qwen/Qwen3-8B")
 
 API_EMBED_DIM = int(os.getenv("API_EMBED_DIM", "1024"))
+RERANK_MAX_LENGTH = int(os.getenv("RERANK_MAX_LENGTH", "2304"))
 
 # Tự ưu tiên GPU NVIDIA nếu có
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
@@ -90,7 +91,11 @@ def load_models() -> None:
 
     if reranker_model is None:
         print(f"[LOAD] Reranker model: {RERANK_MODEL_NAME}")
-        reranker_model = CrossEncoder(RERANK_MODEL_NAME, device=DEVICE)
+        reranker_model = CrossEncoder(
+            RERANK_MODEL_NAME,
+            device=DEVICE,
+            max_length=RERANK_MAX_LENGTH,
+        )
         print("[OK] Reranker model loaded")
 
     if llm_tokenizer is None or llm_model is None:
@@ -112,6 +117,56 @@ def load_models() -> None:
         llm_model.to(DEVICE)
         llm_model.eval()
         print("[OK] LLM model loaded")
+
+
+def validate_rerank_inputs_not_truncated(
+    query: str,
+    documents: List[str],
+    max_length: int,
+) -> None:
+    """
+    Kiểm tra query-document pair có vượt max_length không.
+
+    Nếu vượt, CrossEncoder có thể truncate text ngầm khi predict.
+    Với rerank, truncate có thể làm score sai, nên trả lỗi rõ ràng.
+    """
+    assert reranker_model is not None
+
+    tokenizer = reranker_model.tokenizer
+    too_long_items = []
+
+    for index, document in enumerate(documents):
+        encoded = tokenizer(
+            query,
+            document,
+            add_special_tokens=True,
+            truncation=False,
+        )
+
+        token_length = len(encoded["input_ids"])
+
+        if token_length > max_length:
+            too_long_items.append(
+                {
+                    "index": index,
+                    "token_length": token_length,
+                    "max_length": max_length,
+                    "document_preview": document[:200],
+                }
+            )
+
+    if too_long_items:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "message": (
+                    "Rerank input is too long and would be truncated. "
+                    "Please chunk the document into smaller pieces or increase RERANK_MAX_LENGTH."
+                ),
+                "max_length": max_length,
+                "too_long_items": too_long_items,
+            },
+        )
 
 
 @app.on_event("startup")
@@ -180,13 +235,13 @@ def generate(req: GenerateRequest):
                 "pad_token_id": llm_tokenizer.eos_token_id,
                 "eos_token_id": llm_tokenizer.eos_token_id,
             }
-            
+
             # Only add sampling parameters if model supports them
             if req.temperature > 0:
                 gen_kwargs["do_sample"] = True
                 gen_kwargs["temperature"] = max(req.temperature, 1e-5)
                 gen_kwargs["top_p"] = 0.95
-            
+
             try:
                 output_ids = llm_model.generate(**inputs, **gen_kwargs)
             except TypeError:
@@ -219,13 +274,23 @@ def rerank(req: RerankRequest):
     try:
         assert reranker_model is not None
 
+        validate_rerank_inputs_not_truncated(
+            query=req.query,
+            documents=req.documents,
+            max_length=RERANK_MAX_LENGTH,
+        )
+
         pairs = [[req.query, doc] for doc in req.documents]
         scores = reranker_model.predict(pairs)
 
         ranked = sorted(
             [
-                {"document": doc, "score": float(score)}
-                for doc, score in zip(req.documents, scores)
+                {
+                    "index": index,
+                    "document": doc,
+                    "score": float(score),
+                }
+                for index, (doc, score) in enumerate(zip(req.documents, scores))
             ],
             key=lambda x: x["score"],
             reverse=True,
@@ -237,6 +302,7 @@ def rerank(req: RerankRequest):
             results.append(
                 {
                     "rank": i,
+                    "index": item["index"],
                     "document": item["document"],
                     "score": item["score"],
                 }
@@ -247,6 +313,9 @@ def rerank(req: RerankRequest):
             "results": results,
             "device": DEVICE,
         }
+
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Rerank error: {exc}") from exc
 

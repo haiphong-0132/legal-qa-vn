@@ -120,10 +120,9 @@ class CrossEncoderReranker:
 
 @dataclass
 class RemoteReranker:
-    """Remote reranker sử dụng rerank host bên ngoài"""
+    """Remote reranker sử dụng rerank host bên ngoài."""
 
     api_client: Any
-    _initialized: bool = field(default=False, init=False, repr=False)
 
     def __post_init__(self) -> None:
         logger.info("RemoteReranker initialized")
@@ -139,14 +138,14 @@ class RemoteReranker:
         self,
         query: str,
         documents: List[ChromaQueryResult],
-        top_k: int
+        top_k: int,
     ) -> List[ChromaQueryResult]:
         if not documents:
             return []
 
         top_k = max(1, min(top_k, len(documents)))
 
-        logger.info(f"Reranking {len(documents)} documents using remote API")
+        logger.info("Reranking %d documents using remote API", len(documents))
 
         doc_texts = [doc.text for doc in documents]
 
@@ -157,25 +156,24 @@ class RemoteReranker:
                 top_k=top_k,
             )
 
-            score_map: dict[str, float] = {
-                item['document']: float(item['score']) for item in results
-            }
-
-            ranked_items: list[dict[str, Any]] = []
-
-            for doc in documents:
-                ranked_items.append({
-                    "doc": doc,
-                    "score": score_map.get(doc.text, 0.0),
-                })
-
-            ranked_items.sort(key=lambda item: item["score"], reverse=True)
-
             result_docs: list[ChromaQueryResult] = []
 
-            for item in ranked_items[:top_k]:
-                doc = item["doc"]
-                score = float(item["score"]) 
+            for item in results:
+                if "index" not in item:
+                    raise ValueError(
+                        "Remote rerank result missing 'index'. "
+                    )
+
+                index = int(item["index"])
+
+                if index < 0 or index >= len(documents):
+                    raise ValueError(
+                        f"Remote rerank returned invalid index={index}, "
+                        f"documents_count={len(documents)}"
+                    )
+
+                doc = documents[index]
+                score = float(item["score"])
 
                 result_docs.append(
                     ChromaQueryResult(
@@ -183,13 +181,13 @@ class RemoteReranker:
                         text=doc.text,
                         metadata=doc.metadata,
                         distance=doc.distance,
-                        score_rerank=score
+                        score_rerank=score,
                     )
                 )
 
-            logger.info(f"Reranking completed. Return {len(result_docs)}")
+            logger.info("Reranking completed. Returned %d results", len(result_docs))
             return result_docs
 
         except Exception as e:
-            logger.error(f"Failed to rerank {e}")
+            logger.error("Failed to rerank: %s", e)
             raise

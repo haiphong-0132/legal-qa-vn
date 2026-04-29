@@ -94,7 +94,7 @@ class SearchService:
     
     def search(
             self,
-            query: str,
+            query: Optional[str] = None,
             query_vector: Optional[List[float]] = None,
             top_k_retrieve: int = 10,
             top_k_rerank: Optional[int] = None,

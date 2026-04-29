@@ -62,7 +62,7 @@ class RAGService:
 
         return self._prompt_template
     
-    def _format_display(self, result: ChromaQueryResult) -> str:
+    def _format_display(self, result: ChromaQueryResult) -> tuple[str, str]:
         # 1. Format section
         metadata = result.metadata or {}
 
