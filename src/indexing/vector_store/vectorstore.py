@@ -29,7 +29,7 @@ class VectorStorePipeline(BaseModel):
             )
         return requests
     
-    def run(self, store: ChromaStore, batch_size: int = None) -> None:
+    def run(self, store: ChromaStore, batch_size: int = 1000) -> None:
         """Upsert toàn bộ chunks vào ChromaStore"""
         requests = self._to_upsert_requests()
         if batch_size:

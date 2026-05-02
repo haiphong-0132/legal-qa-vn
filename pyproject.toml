@@ -28,6 +28,9 @@ dependencies = [
     "transformers>=4.45,<5",
     "torch>=2.7,<2.10",
     "sentence-transformers>=5.4.1",
+    "langchain>=1.2.17",
+    "langgraph>=1.1.10",
+    "langchain-groq>=1.1.2",
 ]
 
 [tool.setuptools.packages.find]
