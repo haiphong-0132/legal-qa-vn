@@ -27,7 +27,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ParquetIndexer")
 
 # --- Cấu hình ---
-CONTENT_PATH = r"D:\PTIT\BTL\NLP\data\data\content.parquet"
+CONTENT_PATH = os.path.join("data", "data", "content.parquet")
 COLLECTION_NAME = "legal_documents"
 CHROMA_DIR = "chroma_db"
 
@@ -111,9 +111,9 @@ class ParquetIndexer:
         )
 
 
-    def run(self, total_parts: int = 1, part_index: int = 0, limit_docs: int = None, start_idx_offset: int = 0):
-        logger.info("Đang khởi tạo dữ liệu Parquet...")
-        lf_content = pl.scan_parquet(CONTENT_PATH)
+    def run(self, content_path: str = CONTENT_PATH, total_parts: int = 1, part_index: int = 0, limit_docs: int = None, start_idx_offset: int = 0):
+        logger.info(f"Đang khởi tạo dữ liệu Parquet từ: {content_path}")
+        lf_content = pl.scan_parquet(content_path)
         total_rows = lf_content.select(pl.len()).collect().item()
         
         if limit_docs:
@@ -193,14 +193,28 @@ if __name__ == "__main__":
     parser.add_argument("--total-parts", type=int, default=1, help="Tổng số máy tham gia")
     parser.add_argument("--part-index", type=int, default=0, help="Số thứ tự của máy này (0 đến total-parts - 1)")
     parser.add_argument("--limit", type=int, default=None, help="Giới hạn tổng số dòng (để test)")
+    parser.add_argument("--input", "-i", type=str, default=CONTENT_PATH, help="Đường dẫn file parquet đầu vào")
     parser.add_argument("--output-dir", type=str, default=CHROMA_DIR, help="Thư mục lưu ChromaDB")
     parser.add_argument("--start-idx", "-sid", type=int, default=0, help="Bắt đầu từ dòng thứ n trong shard này (để resume)")
     
     args = parser.parse_args()
     
     multiprocessing.freeze_support()
+    
+    # Xử lý đường dẫn linh hoạt (tuyệt đối/tương đối)
+    input_path = args.input
+    if not os.path.exists(input_path):
+        # Thử tìm tương đối so với CWD
+        cwd_path = os.path.join(os.getcwd(), input_path)
+        if os.path.exists(cwd_path):
+            input_path = cwd_path
+        else:
+            # Nếu vẫn không thấy, log cảnh báo và để nó lỗi ở bước sau để có traceback rõ ràng
+            logger.warning(f"Cảnh báo: Không tìm thấy file tại {input_path} hoặc {cwd_path}")
+
     indexer = ParquetIndexer(chroma_dir=args.output_dir)
     indexer.run(
+        content_path=input_path,
         total_parts=args.total_parts, 
         part_index=args.part_index, 
         limit_docs=args.limit,

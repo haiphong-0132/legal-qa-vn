@@ -16,6 +16,12 @@
 
 ### Bước 2: Chạy Indexing (Chọn đúng lệnh cho từng máy)
 
+**Các tham số quan trọng:**
+*   `--input` (hoặc `-i`): Đường dẫn file parquet đầu vào (tương đối hay tuyệt đối đều được). Mặc định là `data/data/content.parquet` (tính từ gốc dự án).
+*   `--total-parts`: Tổng số phần (máy) chia sẻ công việc (VD: 12).
+*   `--part-index`: Chỉ số của máy này (từ 0 đến 11).
+*   `--output-dir`: Thư mục lưu kết quả (ChromaDB shard).
+
 | Máy số | Lệnh chạy |
 | :--- | :--- |
 | **Máy 0** | `uv run scripts/index_parquet.py --total-parts 12 --part-index 0 --output-dir "shard_0"` |
