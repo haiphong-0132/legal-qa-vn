@@ -22,7 +22,6 @@ ALLOWED_TOOLS: frozenset = frozenset(
         "search_legal_documents",
         "search_document_metadata",
         "get_specific_article",
-        "find_related_documents",
         "find_cross_references",
     }
 )
@@ -31,27 +30,21 @@ PLANNER_SYSTEM = """Bạn là bộ lập kế hoạch gọi công cụ cho hệ 
 Nhiệm vụ: chọn THỨ TỰ các tool và tham số, JSON duy nhất, không markdown.
 
 Công cụ (tên gọi chính xác):
-1) search_document_metadata — truy vấn bảng metadata tài liệu (số hiệu, tên, ngày ban hành, ngày có hiệu lực, loại, cơ quan).
-   Input: { "so_hieu": str|null, "ten_van_ban": str|null, "doc_type": str|null, "org_unit": str|null, "limit": int } (các trường tùy chọn, truyền cái đã rõ từ câu hỏi/entity).
-2) search_legal_documents — tìm chunk điều/khoản/điểm (RAG, vector).
-   Input: { "query": str, "top_k": int, "include_references": bool } — filter mặc định hệ thống.
-3) get_specific_article — nội dung đúng Điều/Khoản/Điểm khi biết số. Có thể kèm
-   "include_references": true (mặc định) để tải thêm nội dung chunk trong metadata.reference.
-   Input: { "article_block": { ... }, "include_references": bool }
-4) find_related_documents — sửa đổi/bổ sung/thay thế/liên quan theo so_hieu văn bản.
-   Input: { "doc_id": str, "relation_type": str|null }
-5) find_cross_references — tham chiếu chéo giữa chunk.
+1) search_document_metadata — Truy vấn thông tin hành chính của văn bản (Số hiệu, tên, ngày ban hành, cơ quan ban hành, loại văn bản).
+   Dùng khi câu hỏi hỏi về: "Văn bản X do ai ban hành?", "Ngày có hiệu lực của luật Y", "Tìm các nghị định về giao thông"...
+   Input: { "so_hieu": str|null, "ten_van_ban": str|null, "doc_type": str|null, "limit": int }
+2) search_legal_documents — Tìm kiếm nội dung chi tiết bên trong các điều khoản (Vector Search/RAG).
+   Dùng khi câu hỏi là câu hỏi mở hoặc cần tìm nội dung pháp lý cụ thể.
+   Input: { "query": str, "top_k": int, "include_references": bool }
+3) get_specific_article — Lấy nội dung CHÍNH XÁC của một Điều/Khoản/Điểm khi đã biết số hiệu hoặc tên văn bản.
+   Input: { "article_block": { "dieu": str, "khoan": str, ... }, "include_references": bool }
+4) find_cross_references — Tìm các điều khoản khác được trích dẫn/tham chiếu bên trong một điều khoản gốc.
    Input: { "article_block": { ... } } hoặc { "chunk_id": str }.
 
 Quy tắc:
-- Câu hỏi về *thời điểm ban hành, có hiệu lực, tên số hiệu văn bản* → ưu tiên bước `search_document_metadata` (có thể dùng ten_van_ban) TRƯỚC, sau đó mới tới RAG nếu còn cần nội dung điều khoản.
-- Câu hỏi “Điều X nói gì / khoản Y” với tên văn bản rõ → có thể `get_specific_article` (article_block từ extracted_blocks).
-- Câu tổng quát / tìm hiểu chung → `search_legal_documents`.
-- Nhiều bước: tối đa theo max_steps, thứ tự từ trên xuống; sau metadata có thể thêm RAG cùng tên văn bản trong query nếu cần.
-
-Chỉ trả về:
-{"steps": [ {"tool": "<tên>", "input": { ... } }, ... ]}
-Không thêm trường ngoài "steps"."""
+- Ưu tiên `search_document_metadata` TRƯỚC nếu cần xác định danh tính hoặc thông tin ban hành của văn bản.
+- Kết hợp RAG (`search_legal_documents`) sau khi đã có thông tin văn bản để trả lời nội dung chuyên sâu.
+- Chỉ trả về duy nhất JSON: {"steps": [ {"tool": "<tên>", "input": { ... } }, ... ]}"""
 
 
 def _json_safe(obj: Any) -> Any:

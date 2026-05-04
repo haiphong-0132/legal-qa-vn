@@ -26,7 +26,7 @@ class RemoteChatModel(BaseChatModel):
     api_client: RemoteAPIClient
     model_name: str = "custom-remote-llm"
     temperature: float = 0.0
-    max_length: int = 512
+    max_length: int = 4000
 
     @property
     def _llm_type(self) -> str:
@@ -106,8 +106,9 @@ class RemoteChatModel(BaseChatModel):
             json_schema = schema.model_json_schema() if (isinstance(schema, type) and issubclass(schema, BaseModel)) else schema
 
             instruction = (
-                f"\n\nIMPORTANT: Respond ONLY with a valid JSON object matching this schema:\n"
-                f"{json.dumps(json_schema, ensure_ascii=False)}\nNo other text."
+                f"\n\nIMPORTANT: RESPONSE ONLY WITH A VALID JSON OBJECT MATCHING THIS SCHEMA:\n"
+                f"{json.dumps(json_schema, ensure_ascii=False)}\n"
+                f"DO NOT include any thinking process (<think> blocks), preamble, or markdown formatting. ONLY THE JSON."
             )
             if messages and isinstance(messages[0], SystemMessage):
                 messages[0] = SystemMessage(content=messages[0].content + instruction)

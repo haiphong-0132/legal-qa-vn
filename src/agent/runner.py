@@ -23,6 +23,7 @@ from src.api.remote_client import RemoteAPIClient
 from src.indexing.embedding.remote_embedding import RemoteEmbeddingModel
 from src.indexing.vector_store import ChromaStore, ChromaConfig
 from src.search.search import SearchService
+from system.database.db_respository import get_session
 
 from .graph.builder import build_default_graph
 from .llms import build_llm
@@ -45,7 +46,7 @@ EXAMPLE_QUERIES: List[str] = [
 class LegalQARunner:
     def __init__(
         self,
-        checkpointer_kind: str = "sqlite",
+        checkpointer_kind: str = "memory",
         enable_logging: bool = True,
     ):
         if enable_logging:
@@ -75,11 +76,13 @@ class LegalQARunner:
         self.llm = build_llm(api_client=self.api_client)
 
         # 4. Tools provider + graph
+        self.db_session = get_session()
         self.tools_provider = LegalDocumentTools(
             chroma_store=self.chroma_store,
             embedding_model=self.embedding_model,
             llm=self.llm,
             retrieval_service=self.search_service,
+            db_session=self.db_session
         )
         self.graph = build_default_graph(
             llm=self.llm,
