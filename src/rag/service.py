@@ -112,7 +112,7 @@ class RAGService:
             top_k_retrieve=top_k_retrieve or self.top_k_retrieve,
             top_k_rerank=top_k_rerank or self.top_k_rerank,
             use_rerank=use_rerank if use_rerank is not None else self.use_rerank,
-            score_threshold=distance_threshold,
+            distance_threshold=distance_threshold,
             metadata_filter=metadata_filter,
         )
 
