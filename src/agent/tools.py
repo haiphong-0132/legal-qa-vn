@@ -2,13 +2,17 @@
 Legal Agent Tools — Bộ công cụ tìm kiếm cho LangGraph Agent.
 
 Gồm 3 tool cốt lõi:
-1. vector_search       — Tìm kiếm ngữ nghĩa (semantic) trong ChromaDB.
-2. metadata_search     — Tìm kiếm chính xác theo Điều/Khoản/Số hiệu trong ChromaDB.
-3. doc_metadata_search — Tra cứu thông tin văn bản trong SQLite.
+1. vector_search         — Tìm kiếm ngữ nghĩa (semantic) trong ChromaDB.
+2. chunk_metadata_search — Tìm kiếm chính xác theo Điều/Khoản/Số hiệu trong ChromaDB.
+3. doc_metadata_search   — Tra cứu thông tin văn bản trong SQLite.
 
 Mỗi tool trả về ToolOutput (xem schemas.py).
 Chunks dùng ChromaQueryResult trực tiếp (không wrap thêm).
 Documents dùng DocumentItem DTO để tách khỏi ORM session.
+
+Helper nội bộ:
+- _get_base_chunk_id      — Chuẩn hóa chunk_id, loại bỏ hậu tố __dup_N.
+- _filter_redundant_chunks — Loại bỏ các chunk con khi tổ tiên đã có trong kết quả.
 """
 from __future__ import annotations
 
@@ -45,6 +49,70 @@ def _fuzzy_score(a: str, b: str) -> float:
     if not na or not nb:
         return 0.0
     return SequenceMatcher(None, na, nb).ratio()
+
+
+def _get_base_chunk_id(chunk_id: str) -> str:
+    """Chuẩn hóa chunk_id bằng cách loại bỏ hậu tố __dup_N ở từng segment.
+
+    Ví dụ:
+        "91_2015_qh13.dieu_6__dup_0.khoan_1" -> "91_2015_qh13.dieu_6.khoan_1"
+    """
+    segments = chunk_id.strip().split(".")
+    clean_segments = [
+        seg.rsplit("__dup_", 1)[0] if "__dup_" in seg else seg
+        for seg in segments
+    ]
+    return ".".join(clean_segments)
+
+
+def _filter_redundant_chunks(
+    chunks: List[ChromaQueryResult],
+) -> List[ChromaQueryResult]:
+    """Loại bỏ các chunk con (cháu, chắt) nếu tổ tiên của chúng đã xuất hiện
+    trong cùng danh sách kết quả.
+
+    Nguyên tắc: chunk_id được tổ chức theo cấu trúc phân cấp dấu-chấm::
+
+        <so_hieu>.<section_a>.<section_b>.<section_c>...
+
+    Chunk B là con của Chunk A khi base_id của A là tiền tố của base_id của B.
+    Nếu cả A và B cùng có mặt, B bị loại bỏ vì thông tin B đã nằm trong A.
+
+    Args:
+        chunks: Danh sách kết quả truy vấn từ ChromaDB, thứ tự được giữ nguyên.
+
+    Returns:
+        Danh sách chunks đã lọc, không chứa chunk nào có tổ tiên trong danh sách.
+    """
+    if not chunks:
+        return []
+
+    # Tập hợp tất cả base_id đang có trong kết quả để tra cứu O(1)
+    retrieved_base_ids: set[str] = {
+        _get_base_chunk_id(c.chunk_id) for c in chunks
+    }
+
+    filtered: List[ChromaQueryResult] = []
+    for chunk in chunks:
+        base_id = _get_base_chunk_id(chunk.chunk_id)
+        segments = base_id.split(".")
+
+        # Sinh tất cả tổ tiên (từ gần nhất đến xa nhất): bỏ lần lượt segment cuối
+        ancestors = {
+            ".".join(segments[:depth])
+            for depth in range(1, len(segments))
+        }
+
+        if ancestors & retrieved_base_ids:
+            # Có ít nhất một tổ tiên đã được lấy → bỏ chunk này
+            logger.debug(
+                "[filter_redundant] Bỏ chunk con '%s' (tổ tiên đã có trong kết quả).",
+                chunk.chunk_id,
+            )
+        else:
+            filtered.append(chunk)
+
+    return filtered
 
 
 def _chunk_display(result: ChromaQueryResult) -> str:
@@ -120,7 +188,6 @@ class LegalAgentTools:
         """
         tool_name = "vector_search"
         try:
-
             chunks: List[ChromaQueryResult] = self.search_service.search(
                 query=query,
                 top_k_retrieve=top_k_retrieve,
@@ -134,6 +201,8 @@ class LegalAgentTools:
                     success=False,
                     display_text="Không tìm thấy thông tin liên quan.",
                 )
+
+            chunks = _filter_redundant_chunks(chunks)
 
             return ToolOutput(
                 tool_name=tool_name,
@@ -261,6 +330,8 @@ class LegalAgentTools:
                     success=False,
                     display_text="Không tìm thấy điều khoản theo tiêu chí đã cho.",
                 )
+
+            # chunks = _filter_redundant_chunks(chunks)
 
             return ToolOutput(
                 tool_name=tool_name,
