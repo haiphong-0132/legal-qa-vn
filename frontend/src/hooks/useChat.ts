@@ -98,15 +98,12 @@ export const useChat = () => {
       return session;
     }));
 
-    // Gọi API thật tới backend api_server.py
+    // Gọi API qua Vite proxy (đã cấu hình trong vite.config.ts)
     try {
-      const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:8001';
-      console.log(apiUrl)
-      const response = await fetch(`${apiUrl}/api/chat`, {
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Bypass-Tunnel-Reminder': 'true'
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           query: currentInput,
