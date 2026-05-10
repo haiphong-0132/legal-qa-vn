@@ -1,7 +1,7 @@
 from src.core.models import DocumentMetadata
 from typing import List, Optional
 from pathlib import Path
-from sqlalchemy import create_engine, or_
+from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 import logging
 from datetime import datetime

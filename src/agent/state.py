@@ -21,13 +21,11 @@ from .schemas import Intent, ToolOutput
 class AgentState(TypedDict, total=False):
     """
     Trạng thái Agent chạy qua LangGraph.
-
-    Lifecycle:
-        1. `question` được set từ đầu vào người dùng.
-        2. Node `analyze` điền intent, sub_questions, linh_vuc, keywords.
-        3. Router phân nhánh theo intent.
-        4. Các node tool tích lũy vào `tool_outputs` và `context_chunks`.
-        5. Node `generate` đọc context và tạo `answer`.
+    - `question` được set từ đầu vào người dùng.
+    - Node `analyze` điền intent, sub_questions, linh_vuc, keywords.
+    - Router phân nhánh theo intent.
+    - Các node tool tích lũy vào `tool_outputs` và `context_chunks`.
+    - Node `generate` đọc context và tạo `answer`.
     """
 
     question: str
