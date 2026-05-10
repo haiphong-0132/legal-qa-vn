@@ -200,13 +200,13 @@ def run_migrations():
                 for m in b["metadatas"]:
                     if m and m.get("so_hieu") and m.get("so_hieu") not in unique_docs:
                         unique_docs[m.get("so_hieu")] = {
-                            'so_hieu': m.get('so_hieu'),
-                            'ten_van_ban': m.get('ten_van_ban', 'Chưa xác định'),
-                            'loai': m.get('loai', 'Văn bản'),
-                            'co_quan_ban_hanh': m.get('co_quan_ban_hanh'),
-                            'ngay_ban_hanh': m.get('ngay_ban_hanh'),
-                            'ngay_co_hieu_luc': m.get('ngay_co_hieu_luc'),
-                            'file_path': m.get('file_path'),
+                            'so_hieu': m.get('so_hieu') or "",
+                            'ten_van_ban': m.get('ten_van_ban') or "Chưa xác định",
+                            'loai': m.get('loai') or "Văn bản",
+                            'co_quan_ban_hanh': m.get('co_quan_ban_hanh') or "",
+                            'ngay_ban_hanh': m.get('ngay_ban_hanh') or "",
+                            'ngay_co_hieu_luc': m.get('ngay_co_hieu_luc') or "",
+                            'file_path': m.get('file_path') or "",
                             'indexed': 1,
                             'trang_thai': m.get('trang_thai', 1)
                         }
