@@ -20,11 +20,20 @@ const DocumentReplacement: React.FC = () => {
   const fetchDocuments = async () => {
     try {
       const response = await fetch('/api/documents');
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents');
+      }
       const data = await response.json();
-      setDocuments(data);
+      if (Array.isArray(data)) {
+        setDocuments(data);
+      } else {
+        console.error('Invalid documents data:', data);
+        setDocuments([]);
+      }
     } catch (error) {
       console.error('Error fetching documents:', error);
       setStatus('Lỗi khi tải danh sách văn bản');
+      setDocuments([]);
     }
   };
 

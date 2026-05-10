@@ -62,7 +62,7 @@ rag_service = None
 @app.post("/api/chat", response_model=ChatResponse)
 def chat_endpoint(req: ChatRequest):
     try:
-        init_services(req)
+        # init_services(req)
         result = rag_service.answer(query=req.query)
         
         # Trích xuất các source documents để làm citation
@@ -81,20 +81,24 @@ def chat_endpoint(req: ChatRequest):
 
 @app.get("/api/documents")
 def list_documents():
+    db_service = None
     try:
         db_service = DocumentDatabaseService()
         documents = db_service.get_all_documents(limit=1000)
-        # Filter only active documents if needed, or return all
         return documents
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if db_service:
+            db_service.close()
 
 @app.post("/api/replace-document")
 async def replace_document(
     file: UploadFile = File(...),
     replaced_so_hieu: str = Form(...)
 ):
+    replace_service = None
     try:
         # Create temp directory if not exists
         temp_dir = os.path.join(os.getcwd(), "temp_uploads")
@@ -111,13 +115,13 @@ async def replace_document(
         replace_service = ReplaceFileService(chroma_store=chroma_store)
         result = replace_service.process(new_file_path=file_path, replaced_so_hieu=replaced_so_hieu)
         
-        # Optional: cleanup temp file
-        # os.remove(file_path)
-        
         return result
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if replace_service:
+            replace_service.close()
 
 if __name__ == "__main__":
     print("Starting API Server for Frontend at http://localhost:8001")

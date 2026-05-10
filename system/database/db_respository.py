@@ -103,9 +103,9 @@ class DocumentMetadataRepository:
             DocumentMetadataDB.linh_vuc.ilike(f"%{linh_vuc}%")
         ).limit(limit).all()
 
-    def get_all(self, limit: int = 10) -> List[DocumentMetadataDB]:
+    def get_all(self, limit: int = 10, offset: int = 0) -> List[DocumentMetadataDB]:
         """Lấy danh sách văn bản."""
-        return self.session.query(DocumentMetadataDB).limit(limit).all()
+        return self.session.query(DocumentMetadataDB).limit(limit).offset(offset).all()
 
     def exists(self, so_hieu: str) -> bool:
         return self.get_by_so_hieu(so_hieu) is not None
