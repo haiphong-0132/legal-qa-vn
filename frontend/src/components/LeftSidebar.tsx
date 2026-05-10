@@ -1,6 +1,6 @@
-import React from 'react';
-import { Home, Sparkles, MessageSquare, LogOut, Info } from 'lucide-react';
+import { Home, Sparkles, MessageSquare, LogOut, FileEdit } from 'lucide-react';
 import './LeftSidebar.css';
+import DocumentReplacement from './DocumentReplacement';
 
 const LeftSidebar: React.FC = () => {
   return (
@@ -26,6 +26,13 @@ const LeftSidebar: React.FC = () => {
             <Sparkles className="nav-icon" size={18} />
             <span>AI pháp luật</span>
           </div>
+        </div>
+
+        <div className="sidebar-section">
+          <div className="section-title">
+            <span>QUẢN LÝ VĂN BẢN</span>
+          </div>
+          <DocumentReplacement />
         </div>
       </div>
 
