@@ -12,6 +12,7 @@ from system.replace_file_service import ReplaceFileService
 from system.database.db_service import DocumentDatabaseService
 import shutil
 import os
+from sqlalchemy import text
 
 app = FastAPI(title="Legal QA Frontend API")
 
@@ -40,24 +41,24 @@ search_service = None
 api_client = None
 rag_service = None
 
-# def init_services(req: ChatRequest):
-#     global search_service, api_client, rag_service
-#     if not search_service:
-#         search_service = build_search_service(
-#             use_remote_embedding=req.use_remote_embedding,
-#             use_rerank=True,
-#             use_remote_rerank=req.use_remote_rerank,
-#         )
-#     if not api_client:
-#         api_client = RemoteAPIClient()
+def init_services(req: ChatRequest):
+    global search_service, api_client, rag_service
+    if not search_service:
+        search_service = build_search_service(
+            use_remote_embedding=req.use_remote_embedding,
+            use_rerank=True,
+            use_remote_rerank=req.use_remote_rerank,
+        )
+    if not api_client:
+        api_client = RemoteAPIClient()
     
-#     rag_service = RAGService(
-#         search_service=search_service,
-#         api_client=api_client,
-#         top_k_retrieve=req.top_k_retrieve,
-#         top_k_rerank=req.top_k_rerank,
-#         use_rerank=True,
-#     )
+    rag_service = RAGService(
+        search_service=search_service,
+        api_client=api_client,
+        top_k_retrieve=req.top_k_retrieve,
+        top_k_rerank=req.top_k_rerank,
+        use_rerank=True,
+    )
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat_endpoint(req: ChatRequest):
@@ -123,6 +124,71 @@ async def replace_document(
         if replace_service:
             replace_service.close()
 
+def run_migrations():
+    """Tự động chạy migration cho SQLite và ChromaDB khi khởi động server."""
+    print("--- Running Auto-Migrations ---")
+    try:
+        # 1. SQLite Migration
+        from system.database.db_respository import get_database
+        db_manager = get_database()
+        with db_manager.engine.connect() as conn:
+            result = conn.execute(text("PRAGMA table_info(document_metadata)"))
+            columns = [row[1] for row in result.fetchall()]
+            if "trang_thai" not in columns:
+                print("Adding 'trang_thai' column to SQLite...")
+                conn.execute(text("ALTER TABLE document_metadata ADD COLUMN trang_thai INTEGER DEFAULT 1"))
+                conn.execute(text("UPDATE document_metadata SET trang_thai = 1 WHERE trang_thai IS NULL"))
+                conn.commit()
+                print("✓ SQLite migration completed.")
+            else:
+                print("✓ SQLite 'trang_thai' column already exists.")
+
+        # 2. ChromaDB Migration
+        from main import build_chroma_store
+        chroma_store = build_chroma_store()
+        collection = chroma_store.collection
+        total = collection.count()
+        if total > 0:
+            print(f"Checking ChromaDB migration for {total} chunks...")
+            # Lấy batch đầu tiên để kiểm tra xem đã có trang_thai chưa
+            batch = collection.get(limit=10, include=["metadatas"])
+            needs_update = False
+            for meta in batch.get("metadatas", []):
+                if meta and "trang_thai" not in meta:
+                    needs_update = True
+                    break
+            
+            if needs_update:
+                print("Updating 'trang_thai' in ChromaDB (batch processing)...")
+                offset = 0
+                batch_size = 500
+                while offset < total:
+                    b = collection.get(limit=batch_size, offset=offset, include=["metadatas"])
+                    ids = b["ids"]
+                    metas = b["metadatas"]
+                    if not ids: break
+                    
+                    ids_to_up = []
+                    metas_to_up = []
+                    for i, m in zip(ids, metas):
+                        if m is None: m = {}
+                        if "trang_thai" not in m:
+                            m["trang_thai"] = 1
+                            ids_to_up.append(i)
+                            metas_to_up.append(m)
+                    
+                    if ids_to_up:
+                        collection.update(ids=ids_to_up, metadatas=metas_to_up)
+                    offset += len(ids)
+                print("✓ ChromaDB migration completed.")
+            else:
+                print("✓ ChromaDB chunks already have 'trang_thai'.")
+    except Exception as e:
+        print(f"Error during migration: {e}")
+        traceback.print_exc()
+    print("--- Migrations Finished ---\n")
+
 if __name__ == "__main__":
+    run_migrations()
     print("Starting API Server for Frontend at http://localhost:8001")
     uvicorn.run(app, host="0.0.0.0", port=8001)
