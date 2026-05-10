@@ -30,7 +30,7 @@ logger = logging.getLogger(__name__)
 CHROMA_DIR        = "chroma_db"           # Thư mục ChromaDB persist
 COLLECTION_NAME   = "legal_documents"     # Tên collection
 BATCH_SIZE        = 500                   # Số chunk cập nhật mỗi lần (tránh OOM)
-# ──────────────────────────────────────────────────────────────────────────────
+
 
 
 def migrate(chroma_dir: str, collection_name: str, batch_size: int) -> None:
