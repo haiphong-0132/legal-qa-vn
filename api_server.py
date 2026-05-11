@@ -148,15 +148,23 @@ def get_relation_types():
         from system.database.db import DocumentRelationDB
         from sqlalchemy import func
         
-        # Lấy distinct relation_type
-        results = session.query(DocumentRelationDB.relation_type).distinct().all()
-        types = [r[0] for r in results if r[0]]
+        # Lấy các loại mặc định
+        default_types = ["Thay thế", "Sửa đổi, bổ sung", "Hướng dẫn", "Căn cứ"]
         
-        # Nếu DB trống, trả về một số loại mặc định
-        if not types:
-            types = ["Thay thế", "Sửa đổi, bổ sung", "Hướng dẫn", "Căn cứ"]
+        # Lấy distinct relation_type từ DB
+        db_results = session.query(DocumentRelationDB.relation_type).distinct().all()
+        db_types = [r[0] for r in db_results if r[0]]
+        
+        # Hợp nhất và loại bỏ trùng lặp
+        all_types = list(set(default_types + db_types))
+        
+        # Sắp xếp để "Thay thế" luôn ở đầu hoặc theo bảng chữ cái
+        all_types.sort()
+        if "Thay thế" in all_types:
+            all_types.remove("Thay thế")
+            all_types.insert(0, "Thay thế")
             
-        return types
+        return all_types
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

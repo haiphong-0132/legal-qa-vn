@@ -45,6 +45,9 @@ const DocumentRelationModal: React.FC<DocumentRelationModalProps> = ({ isOpen, o
       const response = await fetch(`${API_BASE_URL}/api/relation-types`);
       const data = await response.json();
       setAvailableTypes(data);
+      if (data.length > 0 && !data.includes(relationType)) {
+        setRelationType(data[0]);
+      }
     } catch (error) {
       console.error('Error fetching relation types:', error);
     }
