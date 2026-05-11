@@ -590,6 +590,7 @@ class LegalAgentTools:
         # Logic: nếu main_id là tiền tố của ref_id (ref là con cháu),
         #        hoặc ref_id là tiền tố của main_id (ref là tổ tiên),
         #        thì thông tin đã bao hàm trong nhau → không cần đánh giá.
+        # ---
         main_base_id = _get_base_chunk_id(main_chunk.chunk_id)
         candidate_ref_ids: List[str] = []
         for ref_id in raw_refs:
