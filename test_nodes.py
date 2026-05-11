@@ -98,8 +98,8 @@ def test_doc_relation(llm, tools):
     doc_relation_node = make_doc_relation_node(tools, llm)
     
     state = {
-        "question": "Cho tôi thông tin cơ bản về BỘ LUẬT HÌNH SỰ",
-        "current_sub_question": SubQuestion(query="Cho tôi thông tin cơ bản về BỘ LUẬT HÌNH SỰ", intent=Intent.DOC_RELATION),
+        "question": "Nghị định về kinh doanh rượu có bao nhiêu điều tất cả?",
+        "current_sub_question": SubQuestion(query="Nghị định về kinh doanh rượu có bao nhiêu điều tất cả?", intent=Intent.DOC_RELATION),
         "context_text": [],
         "tool_outputs": [],
         "messages": []

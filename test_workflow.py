@@ -232,6 +232,48 @@ def test_chitchat_intent(deps: dict):
 
 
 # ---------------------------------------------------------------------------
+# Interactive Mode
+# ---------------------------------------------------------------------------
+
+def interactive_mode(deps: dict):
+    """Mode nhập tự do: người dùng nhập câu hỏi và workflow trả lời."""
+    print("\n" + "="*80)
+    print("INTERACTIVE MODE - Nhập câu hỏi tuỳ ý")
+    print("="*80)
+    print("(Nhập 'quit' hoặc 'exit' để thoát)\n")
+    
+    while True:
+        try:
+            question = input("📝 Câu hỏi của bạn: ").strip()
+            
+            if question.lower() in ['quit', 'exit', 'q']:
+                print("\nTạm biệt! 👋\n")
+                break
+            
+            if not question:
+                print("⚠ Vui lòng nhập câu hỏi.\n")
+                continue
+            
+            # Chạy workflow
+            result = run_workflow_test(question, deps)
+            
+            if result is None:
+                print("\n❌ Workflow thất bại. Vui lòng thử lại.\n")
+                continue
+            
+            print("\n")
+        
+        except KeyboardInterrupt:
+            print("\n\nTạm biệt! 👋\n")
+            break
+        except Exception as e:
+            print(f"\n❌ Lỗi: {e}\n")
+            import traceback
+            traceback.print_exc()
+            continue
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -250,34 +292,49 @@ if __name__ == "__main__":
         traceback.print_exc()
         sys.exit(1)
     
-    # List of tests
-    tests = [
-        ("TC1: Single legal_query", test_single_legal_query),
-        ("TC2: Single doc_relation", test_single_doc_relation),
-        ("TC3: Single general", test_single_general),
-        ("TC4: Multiple sub_questions + merge_results", test_multiple_sub_questions),
-        ("TC5: Fallback chitchat", test_chitchat_intent),
-    ]
+    # Menu lựa chọn
+    print("\n" + "="*80)
+    print("CHỌN CHẾ ĐỘ")
+    print("="*80)
+    print("1. Chạy test cases (TC1-TC5)")
+    print("2. Mode tương tác (nhập câu hỏi tuỳ ý)")
+    print()
     
-    passed = 0
-    failed = 0
+    mode = input("Chọn chế độ (1 hoặc 2): ").strip()
     
-    for test_name, test_fn in tests:
-        try:
-            print(f"\n\n{'='*80}")
-            print(f"Running: {test_name}")
-            print('='*80)
-            test_fn(deps)
-            passed += 1
-        except Exception as e:
-            print(f"\n[FAIL] {test_name}: {e}")
-            import traceback
-            traceback.print_exc()
-            failed += 1
-    
-    # Summary
-    print(f"\n\n{'='*80}")
-    print(f"SUMMARY: {passed} passed / {failed} failed / {len(tests)} total")
-    print(f"{'='*80}\n")
-    
-    sys.exit(0 if failed == 0 else 1)
+    if mode == "2":
+        # Interactive mode
+        interactive_mode(deps)
+    else:
+        # Test cases mode (default)
+        # List of tests
+        tests = [
+            ("TC1: Single legal_query", test_single_legal_query),
+            ("TC2: Single doc_relation", test_single_doc_relation),
+            ("TC3: Single general", test_single_general),
+            ("TC4: Multiple sub_questions + merge_results", test_multiple_sub_questions),
+            ("TC5: Fallback chitchat", test_chitchat_intent),
+        ]
+        
+        passed = 0
+        failed = 0
+        
+        for test_name, test_fn in tests:
+            try:
+                print(f"\n\n{'='*80}")
+                print(f"Running: {test_name}")
+                print('='*80)
+                test_fn(deps)
+                passed += 1
+            except Exception as e:
+                print(f"\n[FAIL] {test_name}: {e}")
+                import traceback
+                traceback.print_exc()
+                failed += 1
+        
+        # Summary
+        print(f"\n\n{'='*80}")
+        print(f"SUMMARY: {passed} passed / {failed} failed / {len(tests)} total")
+        print(f"{'='*80}\n")
+        
+        sys.exit(0 if failed == 0 else 1)
