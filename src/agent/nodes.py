@@ -201,53 +201,68 @@ def make_doc_relation_node(retriever: Any, llm_client: Any) -> Callable[[AgentSt
         prompt = DOC_RELATION_PROMPT + f"\n\nCâu hỏi: {query}"
         try:
             raw_response = llm_client.generate(prompt=prompt)
+            print(f"\n[DEBUG Doc Relation] Raw LLM Response:\n{raw_response}\n")
+            
             clean_json = raw_response
             match = re.search(r"```(?:json)?(.*?)```", raw_response, re.DOTALL)
             if match:
                 clean_json = match.group(1).strip()
+            
+            print(f"[DEBUG Doc Relation] Cleaned JSON:\n{clean_json}\n")
                 
             json_dict = json.loads(clean_json)
             citation = LegalCitation.model_validate(json_dict)
             
-            so_hieu_to_search = citation.so_hieu
+            print(f"[DEBUG Doc Relation] Parsed Citation: so_hieu='{citation.so_hieu}', ten_van_ban='{citation.ten_van_ban}'\n")
+            
+            so_hieu_list = []
+            if citation.so_hieu:
+                so_hieu_list.append(citation.so_hieu)
             
             # 2. Tìm số hiệu chuẩn nếu chỉ có tên văn bản
-            if not so_hieu_to_search and citation.ten_van_ban:
+            if not so_hieu_list and citation.ten_van_ban:
                 print(f"[Doc Relation Node] Tìm số hiệu chuẩn cho tên văn bản: '{citation.ten_van_ban}'...")
                 doc_output = retriever.doc_metadata_search(
                     ten_van_ban=citation.ten_van_ban, 
-                    limit=1,
+                    limit=5,
                     fuzzy_threshold=0.6
                 )
                 if doc_output.success and doc_output.documents:
-                    so_hieu_to_search = doc_output.documents[0].so_hieu
-                    print(f"[Doc Relation Node] Đã tìm thấy số hiệu chuẩn: {so_hieu_to_search}")
+                    so_hieu_list = [doc.so_hieu for doc in doc_output.documents if doc.so_hieu]
+                    print(f"[Doc Relation Node] Đã tìm thấy các số hiệu chuẩn: {so_hieu_list}")
                 else:
                     print(f"[Doc Relation Node] Không tìm thấy văn bản nào có tên '{citation.ten_van_ban}'")
             
-            # 3. Tra cứu quan hệ bằng so_hieu_to_search
-            if so_hieu_to_search:
-                print(f"[Doc Relation Node] Tra cứu quan hệ cho số hiệu: {so_hieu_to_search}")
-                tool_output = retriever.doc_relation_search(so_hieu=so_hieu_to_search)
+            from src.agent.schemas import ToolOutput
+            all_tool_outputs = []
+            
+            # 3. Tra cứu quan hệ bằng danh sách so_hieu
+            if so_hieu_list:
+                combined_texts = []
+                for sh in so_hieu_list:
+                    print(f"[Doc Relation Node] Tra cứu quan hệ cho số hiệu: {sh}")
+                    t_out = retriever.doc_relation_search(so_hieu=sh)
+                    all_tool_outputs.append(t_out)
+                    if t_out.success and t_out.display_text:
+                        combined_texts.append(t_out.display_text)
+                
+                if combined_texts:
+                    context_str = f"--- QUAN HỆ VĂN BẢN CHO: '{query}' ---\n" + "\n\n".join(combined_texts)
+                else:
+                    context_str = f"--- KHÔNG TÌM THẤY THÔNG TIN VỀ QUAN HỆ VĂN BẢN CHO '{query}' ---\n"
             else:
                 # Không fallback sang vector search ở nhánh này!
-                # Nhánh doc_relation yêu cầu phải tìm đích danh văn bản.
-                from src.agent.schemas import ToolOutput
-                tool_output = ToolOutput(
+                t_out = ToolOutput(
                     tool_name="doc_relation_search",
                     success=False,
                     display_text=f"Không tìm thấy văn bản '{citation.ten_van_ban or query}' trong CSDL hiện tại để tra cứu thông tin/quan hệ."
                 )
-
-            # Đóng gói kết quả
-            if tool_output.success and tool_output.display_text:
-                context_str = f"--- QUAN HỆ VĂN BẢN CHO: '{query}' ---\n{tool_output.display_text}"
-            else:
-                context_str = f"--- LỖI TÌM KIẾM CHO '{query}' ---\n{tool_output.display_text or ''}"
+                all_tool_outputs.append(t_out)
+                context_str = f"--- LỖI TÌM KIẾM CHO '{query}' ---\n{t_out.display_text}"
                 
             return {
                 "context_text": [context_str],
-                "tool_outputs": [tool_output]
+                "tool_outputs": all_tool_outputs
             }
             
         except Exception as e:

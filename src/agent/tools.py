@@ -402,7 +402,9 @@ class LegalAgentTools:
                     rows = [row]
 
             elif ten_van_ban:
-                candidates = self.meta_repo.search_by_name(ten_van_ban.upper().strip(), limit=limit * 3)
+                # Tăng limit lên rất cao để vét cạn DB, vì mệnh đề LIKE %tên% sẽ trả về rất nhiều 
+                # văn bản liên quan (luật sửa đổi, nghị định hướng dẫn, v.v.)
+                candidates = self.meta_repo.search_by_name(ten_van_ban.strip(), limit=limit * 20)
                 if candidates:
                     scored = [
                         (
