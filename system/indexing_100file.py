@@ -144,4 +144,5 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--directory",type=str, required=True, help="Directory path")
     args = parser.parse_args()
     indexing = Indexing()
-    indexing.run_directory(args.directory)  
+    # indexing.run_directory(args.directory)  
+    indexing.run_single_file(args.directory)

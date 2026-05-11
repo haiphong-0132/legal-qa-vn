@@ -14,8 +14,19 @@ from src.indexing.vector_store import ChromaStore
 from system.indexing_100file import Indexing
 from system.database.db_respository import init_database
 from system.database.db_service import DocumentDatabaseService
+from src.indexing.parsing.extract_metadata import Extractor
 
 logger = logging.getLogger(__name__)
+
+
+def display_to_enum_value(display_text: str) -> str:
+    """Chuyển display text → enum value."""
+    mapping = {
+        "Thay thế": RelationType.thay_the,
+        "Hướng dẫn thi hành": RelationType.huong_dan_thi_hanh,
+        "Căn cứ": RelationType.can_cu,
+    }
+    return mapping.get(display_text, display_text)
 
 
 class ReplaceFileService:
@@ -32,7 +43,7 @@ class ReplaceFileService:
         Args:
             new_file_path:      Đường dẫn tới file văn bản mới (upload).
             replaced_so_hieu:   Số hiệu của văn bản quan hệ (đã có trong CSDL).
-            relation_type:      Loại quan hệ (Thay thế, Sửa đổi, Hướng dẫn...).
+            relation_type:      Loại quan hệ (Display text: Thay thế, Hướng dẫn thi hành, Căn cứ).
         """
         result = {
             "new_so_hieu": None,
@@ -42,6 +53,11 @@ class ReplaceFileService:
             "chroma_deactivated": 0,
             "relation_saved": False,
         }
+        extractor=Extractor()
+        replaced_so_hieu=extractor._extract_so_hieu(replaced_so_hieu.strip())
+
+        # Chuyển display text → enum value để lưu vào DB
+        relation_enum = display_to_enum_value(relation_type.strip())
 
         # 1. Parse, chunk, index văn bản mới
         logger.info("[1/3] Indexing văn bản mới: %s", new_file_path)
@@ -60,24 +76,26 @@ class ReplaceFileService:
         result["sqlite_saved"] = index_result.get("metadata_saved_count", 0) > 0
 
         # 2. Vô hiệu hóa văn bản cũ CHỈ KHI quan hệ là "Thay thế"
-        if relation_type == "Thay thế":
+        if relation_enum == RelationType.thay_the:
             logger.info("[2/3] Vô hiệu hóa văn bản bị thay thế: '%s'", replaced_so_hieu)
             sqlite_ok, chunks_deactivated = self.db_service.deactivate_document(replaced_so_hieu)
             result["sqlite_deactivated"] = sqlite_ok
             result["chroma_deactivated"] = chunks_deactivated
             logger.info("  → Đã vô hiệu hóa văn bản cũ.")
+        elif relation_enum in [RelationType.huong_dan_thi_hanh, RelationType.can_cu]:
+            logger.info("[2/3] Giữ nguyên hiệu lực văn bản cũ (Loại quan hệ: %s)", relation_enum.value)
+            logger.info("  → Chỉ tạo quan hệ tham chiếu, văn bản cũ vẫn có hiệu lực.")
         else:
-            logger.info("[2/3] Giữ nguyên hiệu lực văn bản cũ (Loại quan hệ: %s)", relation_type)
+            logger.info("[2/3] Loại quan hệ không xác định: %s", relation_enum)
 
-        # 3. Tạo quan hệ
-        logger.info("[3/3] Tạo quan hệ %s: '%s' → '%s'", relation_type, new_so_hieu, replaced_so_hieu)
-        # Sử dụng so_hieu làm start/end entities
+        # 3. Tạo quan hệ (lưu enum value vào DB)
+        logger.info("[3/3] Tạo quan hệ %s: '%s' → '%s'", relation_enum, new_so_hieu, replaced_so_hieu)
         from system.database.db import DocumentRelationDB
         
         db_rel = DocumentRelationDB(
             entity_start=new_so_hieu,
             entity_end=replaced_so_hieu,
-            relation_type=relation_type,
+            relation_type=relation_enum,
             description=f"{new_so_hieu} {relation_type} {replaced_so_hieu}"
         )
         self._session.add(db_rel)
