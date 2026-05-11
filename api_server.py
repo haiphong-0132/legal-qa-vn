@@ -25,8 +25,20 @@ app.add_middleware(
 )
 
 class ChatRequest(BaseModel):
+    """Request cho /api/chat endpoint.
+    
+    Luôn sử dụng Workflow (Agent) mode để xử lý:
+    - Intent classification (CHITCHAT, LEGAL_QUERY, GENERAL, DOC_RELATION)
+    - Tự động quyết định search hay không
+    
+    Parameters:
+        query: Câu hỏi/tin nhắn từ user
+        top_k_retrieve: Số chunks để lấy từ vector search (default=10)
+        top_k_rerank: Số chunks sau khi rerank (default=5)
+        use_remote_embedding: Dùng remote API cho embedding (default=True)
+        use_remote_rerank: Dùng remote API cho rerank (default=True)
+    """
     query: str
-    mode: int = 5
     top_k_retrieve: int = 10
     top_k_rerank: int = 5
     use_remote_embedding: bool = True
@@ -37,74 +49,63 @@ class ChatResponse(BaseModel):
     answer: str
     context: str
 
-# Khởi tạo RAG service lazily
-search_service = None
-api_client = None
-rag_service = None
+# Khởi tạo Workflow dependencies lazily (used by /api/chat)
 workflow_deps = None
 
-def init_services(req: ChatRequest):
-    global search_service, api_client, rag_service
-    if not search_service:
-        search_service = build_search_service(
-            use_remote_embedding=req.use_remote_embedding,
-            use_rerank=True,
-            use_remote_rerank=req.use_remote_rerank,
-        )
-    if not api_client:
-        api_client = RemoteAPIClient()
-    
-    rag_service = RAGService(
-        search_service=search_service,
-        api_client=api_client,
-        top_k_retrieve=req.top_k_retrieve,
-        top_k_rerank=req.top_k_rerank,
-        use_rerank=True,
-    )
+# NOTE: RAG mode dưới đây không còn dùng vì /api/chat luôn dùng workflow
+# Để backup, chúng tôi giữ lại nhưng không active
+# search_service = None
+# api_client = None
+# rag_service = None
+
+# def init_services(req: ChatRequest):
+#     global search_service, api_client, rag_service
+#     if not search_service:
+#         search_service = build_search_service(
+#             use_remote_embedding=req.use_remote_embedding,
+#             use_rerank=True,
+#             use_remote_rerank=req.use_remote_rerank,
+#         )
+#     if not api_client:
+#         api_client = RemoteAPIClient()
+#     
+#     rag_service = RAGService(
+#         search_service=search_service,
+#         api_client=api_client,
+#         top_k_retrieve=req.top_k_retrieve,
+#         top_k_rerank=req.top_k_rerank,
+#         use_rerank=True,
+#     )
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat_endpoint(req: ChatRequest):
     global workflow_deps
     try:
-        if req.mode == 6:
-            # Agent Mode (Workflow)
-            if not workflow_deps:
-                workflow_deps = setup_workflow_dependencies()
-            
-            result = run_workflow_query(req.query, workflow_deps)
-            
-            if not result:
-                return ChatResponse(
-                    query=req.query,
-                    answer="Xin lỗi, tôi gặp lỗi khi xử lý yêu cầu của bạn qua Agent.",
-                    context=""
-                )
-            
-            # Trích xuất context từ agent results
-            context = ""
-            if result.get("context_text"):
-                # context_text là List[str] tích lũy từ các tool
-                context = "\n---\n".join(result["context_text"])
-                
+        # ⭐ LUÔN DÙNG WORKFLOW MODE để xử lý intent trước khi search
+        # Điều này đảm bảo greeting/chitchat không bị search embedding vô nghĩa
+        if not workflow_deps:
+            workflow_deps = setup_workflow_dependencies()
+        
+        result = run_workflow_query(req.query, workflow_deps)
+        
+        if not result:
             return ChatResponse(
                 query=req.query,
-                answer=result.get("answer", "Không tìm thấy câu trả lời."),
-                context=context
+                answer="Xin lỗi, tôi gặp lỗi khi xử lý yêu cầu của bạn.",
+                context=""
             )
-        else:
-            # Default RAG Mode
-            init_services(req)
-            result = rag_service.answer(query=req.query)
+        
+        # Trích xuất context từ agent results
+        context = ""
+        if result.get("context_text"):
+            # context_text là List[str] tích lũy từ các tool
+            context = "\n---\n".join(result["context_text"])
             
-            context = ""
-            if result.context:
-                context = result.context
-                
-            return ChatResponse(
-                query=result.query,
-                answer=result.answer,
-                context=context
-            )
+        return ChatResponse(
+            query=req.query,
+            answer=result.get("answer", "Không tìm thấy câu trả lời."),
+            context=context
+        )
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
