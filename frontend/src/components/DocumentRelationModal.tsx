@@ -116,11 +116,16 @@ const DocumentRelationModal: React.FC<DocumentRelationModalProps> = ({ isOpen, o
             <label>1. Tải lên văn bản mới:</label>
             <div className="file-input-wrapper">
               <input 
+                id="file-upload"
                 type="file" 
                 accept=".doc,.docx" 
                 onChange={e => setFile(e.target.files?.[0] || null)}
+                style={{ display: 'none' }}
               />
-              {file && <span className="file-name">{file.name}</span>}
+              <label htmlFor="file-upload" className="custom-file-btn">
+                {file ? 'Đổi file khác' : 'Chọn file...'}
+              </label>
+              {file && <span className="file-name-display" title={file.name}>{file.name}</span>}
             </div>
           </div>
 
@@ -167,7 +172,12 @@ const DocumentRelationModal: React.FC<DocumentRelationModalProps> = ({ isOpen, o
 
           {status.message && (
             <div className={`modal-status ${status.type}`}>
-              {status.message}
+              <div className="status-header">
+                {status.type === 'error' ? '❌ Lỗi hệ thống' : 'ℹ️ Thông báo'}
+              </div>
+              <div className="status-body">
+                {typeof status.message === 'string' ? status.message : JSON.stringify(status.message)}
+              </div>
             </div>
           )}
         </div>

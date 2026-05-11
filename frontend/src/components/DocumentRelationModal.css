@@ -14,8 +14,9 @@
 
 .modal-content {
   background: white;
-  width: 500px;
-  max-width: 90%;
+  width: 550px;
+  max-width: 95%;
+  max-height: 90vh;
   border-radius: 12px;
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -56,7 +57,33 @@
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1.25rem;
+  overflow-y: auto;
+}
+
+.file-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.custom-file-btn {
+  background: #f3f4f6;
+  border: 1px solid #d1d5db;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.file-name-display {
+  font-size: 13px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
 }
 
 .form-section {
@@ -143,14 +170,35 @@
 }
 
 .modal-status {
-  padding: 0.75rem;
+  padding: 0;
   border-radius: 8px;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  border: 1px solid transparent;
+  overflow: hidden;
 }
 
-.modal-status.error { background: #fef2f2; color: #991b1b; }
-.modal-status.success { background: #f0fdf4; color: #166534; }
-.modal-status.info { background: #eff6ff; color: #1e40af; }
+.status-header {
+  padding: 6px 12px;
+  font-weight: 600;
+  font-size: 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.status-body {
+  padding: 10px 12px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.modal-status.error { background: #fff1f2; color: #991b1b; border-color: #fecaca; }
+.modal-status.error .status-header { background: #fee2e2; }
+.modal-status.success { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
+.modal-status.success .status-header { background: #dcfce7; }
+.modal-status.info { background: #eff6ff; color: #1e40af; border-color: #bfdbfe; }
+.modal-status.info .status-header { background: #dbeafe; }
 
 .modal-footer {
   padding: 1.25rem 1.5rem;
