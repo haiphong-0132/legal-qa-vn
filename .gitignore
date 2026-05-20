@@ -76,3 +76,4 @@ models/
 
 **/node_modules
 database/legal_documents.db
+**/zalo_legal/
