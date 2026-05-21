@@ -18,6 +18,7 @@ if str(PACKAGE_ROOT) not in sys.path:
 from bm_25_wand.utils import tokenize_underthesea_text
 from bm_25_wand.engine import BM25SearchEngine
 from bm_25_wand.indexing import build_champion_index, load_tokenized_corpus
+from bm_25_wand.wand_algorithm import WAND_Algo
 
 TOP_KS = (1, 5, 10, 20)
 MAX_EVAL_K = max(TOP_KS)
@@ -90,6 +91,21 @@ def bm25_search(
 
     ranked = sorted(candidate_scores.items(), key=lambda item: item[1], reverse=True)
     return [doc_idx for doc_idx, _ in ranked]
+
+
+def wand_search(
+    query_terms: list[str],
+    top_k: int,
+    inverted_index: dict[str, list[tuple[int, float]]],
+    term_max_score: dict[str, float],
+) -> tuple[list[int], int]:
+    ranked, fully_evaluated = WAND_Algo(
+        query_terms=query_terms,
+        top_k=top_k,
+        inverted_index=inverted_index,
+        term_max_score=term_max_score,
+    )
+    return [doc_idx for _score, doc_idx in ranked], fully_evaluated
 
 
 def compute_metrics(ranked_doc_ids: list[str], relevant_doc_ids: set[str]) -> dict[int, tuple[float, float, float]]:
@@ -188,9 +204,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output", help="Optional output text file to save results")
     parser.add_argument(
         "--mode",
-        choices=["full", "champion", "both"],
+        choices=["full", "champion", "wand", "both"],
         default="both",
-        help="Run full BM25, champion list BM25, or both",
+        help="Run full BM25, champion list BM25, WAND, or both",
     )
     return parser
 
@@ -210,14 +226,12 @@ def main() -> None:
     if args.model_dir:
         engine = BM25SearchEngine.load(args.model_dir)
         doc_ids = [str(doc.doc_id) for doc in engine.documents]
-        doc_lengths = engine.doc_lengths
-        avgdl = engine.avgdl
         inverted_index = engine.inverted_index
-        idf = engine.idf
         prebuilt_champion_index = engine.champion_index
         champion_size = engine.champion_size
+        term_max_score = engine.term_max_score
     else:
-        doc_ids, doc_lengths, avgdl, inverted_index, idf, _term_max_score = load_tokenized_corpus(
+        doc_ids, doc_lengths, avgdl, inverted_index, idf, term_max_score = load_tokenized_corpus(
             args.corpus_tokenized
         )
         prebuilt_champion_index = None
@@ -269,6 +283,45 @@ def main() -> None:
             )
         )
 
+    if args.mode == "wand":
+        times: list[float] = []
+        per_query_rows: list[dict[int, tuple[float, float, float]]] = []
+        total_fully_evaluated = 0
+        query_ids = [query_id for query_id in queries if query_id in qrels]
+        if not query_ids:
+            raise ValueError("No overlapping query ids between queries and qrels.")
+
+        start_total = time.perf_counter()
+        for query_id in query_ids:
+            start = time.perf_counter()
+            ranked_indices, fully_evaluated = wand_search(
+                queries[query_id],
+                top_k=MAX_EVAL_K,
+                inverted_index=inverted_index,
+                term_max_score=term_max_score,
+            )
+            times.append(time.perf_counter() - start)
+            total_fully_evaluated += fully_evaluated
+            ranked_doc_ids = [doc_ids[idx] for idx in ranked_indices[:MAX_EVAL_K]]
+            per_query_rows.append(compute_metrics(ranked_doc_ids, qrels[query_id]))
+        total_time = time.perf_counter() - start_total
+
+        metrics = aggregate_metrics(per_query_rows)
+        rows.append(
+            {
+                "label": "BM25 wand",
+                "query_count": len(query_ids),
+                "latency_ms": 1000.0 * (total_time / len(query_ids)),
+                "p50_ms": 1000.0 * statistics.median(times),
+                "p95_ms": 1000.0 * sorted(times)[max(0, int(0.95 * len(times)) - 1)],
+                "metrics": metrics,
+            }
+        )
+        output_lines.append(f"wand_fully_evaluated_total={total_fully_evaluated}")
+        output_lines.append(
+            f"wand_fully_evaluated_avg={total_fully_evaluated / len(query_ids):.2f}"
+        )
+
     output_lines.append("model\tlatency_ms\tp50_ms\tp95_ms\tR@1\tR@5\tR@10\tR@20\tMRR@10\tnDCG@10")
     for row in rows:
         metrics = row["metrics"]
@@ -289,4 +342,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-# uv run python -m bm_25_wand.evaluation.evaluate --corpus-tokenized data/zalo_legal/tokens.jsonl --qrels data/zalo_legal/qrels/train.jsonl --queries-raw data/zalo_legal/queries.jsonl --mode full
+# uv run python -m bm_25_wand.evaluation.evaluate --corpus-tokenized data/zalo_legal/tokens.jsonl --qrels data/zalo_legal/qrels/train.jsonl --queries-raw data/zalo_legal/queries.jsonl --mode full --output outputs/bm25_full.txt
+# uv run python -m bm_25_wand.evaluation.evaluate --corpus-tokenized data/zalo_legal/tokens.jsonl --qrels data/zalo_legal/qrels/train.jsonl --queries-raw data/zalo_legal/queries.jsonl --mode wand --output outputs/bm25_wand.txt
