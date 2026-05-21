@@ -37,10 +37,23 @@ def prepare_phobert_text(text: str) -> str:
     return text
 
 
+VIETNAMESE_STOPWORDS = {
+    "bị", "bởi", "các", "cái", "cần", "càng", "chỉ", "chiếc", "cho", "chứ", 
+    "chưa", "chuyện", "có", "có_thể", "cứ", "của", "cùng", "cũng", "đã", "đang", 
+    "đây", "để", "đến", "đều", "điều", "do", "đó", "được", "dưới", "gì", "khi",
+    "không", "là", "lại", "lên", "lúc", "mà", "mỗi", "một_cách", "nay", "này", 
+    "nên", "nếu", "ngay", "nhiều", "như", "nhưng", "những", "nơi", "nữa", "phải", 
+    "qua", "ra", "rằng", "rất", "rồi", "sau", "sẽ", "so", "sự", "tại", "theo", 
+    "thì", "trên", "trong", "trước", "từ", "từng", "và", "vẫn", "vào", "vậy", 
+    "vì", "việc", "với", "vừa", "hoặc"
+}
+
 @lru_cache(maxsize=8192)
 def tokenize_underthesea_text(text: str) -> tuple[str, ...]:
-    text = text.lower().strip()
-    text = _WHITESPACE_RE.sub(" ", text)
+    text = text.lower()
+    # Lọc bỏ dấu câu bằng regex _NON_ALNUM_RE có sẵn
+    text = _NON_ALNUM_RE.sub(" ", text)
+    text = _WHITESPACE_RE.sub(" ", text).strip()
 
     try:
         from underthesea.pipeline.word_tokenize import word_tokenize
@@ -53,7 +66,8 @@ def tokenize_underthesea_text(text: str) -> tuple[str, ...]:
     if not tokenized:
         return ()
 
-    tokens = [tok for tok in tokenized.split() if tok]
+    # Loại bỏ stopword
+    tokens = [tok for tok in tokenized.split() if tok and tok not in VIETNAMESE_STOPWORDS]
     return tuple(tokens)
 
 
