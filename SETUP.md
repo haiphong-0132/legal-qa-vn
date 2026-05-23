@@ -249,7 +249,7 @@ for r in results:
 
 ### 2. Lỗi "CUDA out of memory" (Tràn bộ nhớ GPU)
 *   **Nguyên nhân:** Card đồ họa GPU có bộ nhớ VRAM thấp nhưng cấu hình batch size lớn trong `search_config.yaml`.
-*   **Khắc phục:** Giảm `batch_size: 8` tại mục `embedding` và `reranker`, hoặc ép buộc hệ thống chạy trên CPU bằng cách đặt `device: "cpu"`.
+*   **Khắc phục:** Giảm `batch_size: 8a` tại mục `embedding` và `reranker`, hoặc ép buộc hệ thống chạy trên CPU bằng cách đặt `device: "cpu"`.
 
 ### 3. Lỗi "API key invalid hoặc Quota exceeded"
 *   **Nguyên nhân:** Biến môi trường chưa nhận diện được API Key từ tệp `.env` hoặc Key bị hết hạn/hết hạn ngạch.

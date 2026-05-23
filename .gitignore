@@ -76,3 +76,9 @@ models/
 
 **/node_modules
 database/legal_documents.db
+**/zalo_legal/
+data/*
+*.json
+*.jsonl
+!phong/evaluate/**/*.json
+!phong/evaluate/**/*.jsonl
