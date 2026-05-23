@@ -1,0 +1,5 @@
+corpus_docs=61425
+queries_loaded=3196
+qrels_queries=2432
+model	latency_ms	p50_ms	p95_ms	R@1	R@5	R@10	R@20	MRR@10	nDCG@10
+BM25 full	23.25	24.52	45.07	0.4816	0.7588	0.8296	0.8873	0.6090	0.6604

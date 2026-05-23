@@ -1937,6 +1937,7 @@ dependencies = [
     { name = "docling" },
     { name = "fastapi" },
     { name = "huggingface-hub" },
+    { name = "joblib" },
     { name = "langchain" },
     { name = "langchain-core" },
     { name = "langchain-groq" },
@@ -1977,6 +1978,7 @@ requires-dist = [
     { name = "docling" },
     { name = "fastapi", specifier = ">=0.136.1" },
     { name = "huggingface-hub", specifier = ">=0.36.2" },
+    { name = "joblib", specifier = ">=1.4.2" },
     { name = "langchain", specifier = ">=1.2.17" },
     { name = "langchain-core", specifier = ">=1.2.19" },
     { name = "langchain-groq", specifier = ">=1.1.2" },
@@ -2006,7 +2008,7 @@ requires-dist = [
     { name = "torch", specifier = ">=2.7,<2.10" },
     { name = "tqdm", specifier = ">=4.67.3" },
     { name = "transformers", specifier = ">=4.45,<5" },
-    { name = "underthesea", specifier = ">=9.5.0" },
+    { name = "underthesea", specifier = ">=6.8.4" },
 ]
 
 [[package]]
